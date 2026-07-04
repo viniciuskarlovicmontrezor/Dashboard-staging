@@ -403,6 +403,21 @@ dbg('Pagina caricata (v2). UA: ' + navigator.userAgent.slice(0, 60));
 dbg('Storage: cookies=' + navigator.cookieEnabled + ' indexedDB=' + (!!window.indexedDB));
 
 document.getElementById('google-signin').addEventListener('click', async () => {
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  if (isMobile) {
+    deniedMsg.style.display = 'none';
+    authErrorMsg.style.display = 'none';
+    dbg('Dispositivo mobile rilevato, uso signInWithRedirect diretto...');
+    try {
+      await signInWithRedirect(auth, provider);
+    } catch (e) {
+      dbg('Redirect FALLITO: ' + (e.code || e.message));
+      authErrorMsg.textContent = 'Errore di accesso: ' + (e.code || e.message || 'sconosciuto');
+      authErrorMsg.style.display = 'block';
+    }
+    return;
+  }
+
   deniedMsg.style.display = 'none';
   authErrorMsg.style.display = 'none';
   dbg('Pulsante premuto, apro popup Google...');
