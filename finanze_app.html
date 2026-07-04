@@ -1037,6 +1037,30 @@ const ORIGINAL_CATEGORIES = JSON.parse(JSON.stringify(categories));
   } catch(e) { console.warn('Override non valido, ignorato:', e); }
 })();
 
+/* Sincronizzazione saldo Liquidità con le transazioni registrate in Quick Add.
+   Ogni voce di "Liquidità" mappata su un conto viene trattata come:
+   valore attuale = valore di partenza (baseEur, congelato al primo caricamento)
+   + somma di tutte le entrate/uscite registrate su quel conto in Firestore. */
+const LIQUID_ACCOUNT_MAP = {
+  'Wise (EUR)': 'Wise EUR',
+  'Wise (BRL)': 'Wise BRL',
+  'Cofrinhos': 'Cofrinhos',
+  'Isybank': 'Isybank',
+  'BBVA': 'BBVA',
+  'Itaú': 'Itaú',
+  'XP Conto Corrente': 'XP C/C',
+  'XP Saldo disponibile investimento': 'XP Inv.'
+};
+(function captureLiquidityBaseline(){
+  const liquidCat = categories.find(c => c.label.indexOf('Liquidità') !== -1);
+  if (!liquidCat) return;
+  liquidCat.items.forEach(it => {
+    if (LIQUID_ACCOUNT_MAP[it.name] !== undefined && it.baseEur === undefined) {
+      it.baseEur = it.eur;
+    }
+  });
+})();
+
 let totalPat = categories.reduce((s,c) => s+c.value, 0);
 function recomputeTotals() { totalPat = categories.reduce((s,c) => s+c.value, 0); }
 let activeIdx = null;
@@ -1195,6 +1219,10 @@ function toggleDetail(i) {
   drawDonut(i);
   document.querySelectorAll('#dashboard-view .legend-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('leg-'+i).classList.add('active');
+  renderDetailPanel(i);
+}
+
+function renderDetailPanel(i) {
   const cat=categories[i];
   const pct=((cat.value/totalPat)*100).toFixed(1);
   document.getElementById('center-val').textContent='€ '+cat.value.toLocaleString('it-IT');
@@ -1238,6 +1266,34 @@ function renderTotal() {
   document.querySelector('#dashboard-view .total-value').textContent = fmt(totalPat);
 }
 renderTotal();
+
+/* Aggiorna dal vivo le voci di Liquidità nel Patrimonio Netto usando le
+   transazioni reali di Quick Add (richiede login, come il Flusso Mensile). */
+function refreshPatrimonioLiquidity() {
+  if (!flussoAuthorized || !window.__fin) return;
+  const liquidCat = categories.find(c => c.label.indexOf('Liquidità') !== -1);
+  if (!liquidCat) return;
+  const { db, collection, getDocs } = window.__fin;
+  getDocs(collection(db, 'transactions')).then(snap => {
+    const deltaEur = {};
+    snap.forEach(docSnap => {
+      const d = docSnap.data();
+      const sign = d.type === 'expense' ? -1 : 1;
+      deltaEur[d.account] = (deltaEur[d.account] || 0) + sign * (Number(d.amountEur) || 0);
+    });
+    liquidCat.items.forEach(it => {
+      const accName = LIQUID_ACCOUNT_MAP[it.name];
+      if (!accName || it.baseEur === undefined) return;
+      it.eur = it.baseEur + (deltaEur[accName] || 0);
+    });
+    liquidCat.value = liquidCat.items.reduce((s,it) => s + (it.eur||0), 0);
+    recomputeTotals();
+    drawDonut(activeIdx);
+    renderLegend();
+    renderTotal();
+    if (activeIdx !== null && categories[activeIdx] === liquidCat) renderDetailPanel(activeIdx);
+  }).catch(e => console.error('Errore aggiornamento liquidità patrimonio:', e));
+}
 
 /* ===== CALCOLATORE TRASFERIMENTO TRA BENI/CONTI ===== */
 const RATE_BRL = 5.92, RATE_USD = 1.1371;
@@ -1602,6 +1658,7 @@ window.addEventListener('fin-auth-changed', (e) => {
   flussoAuthorized = !!(e.detail && e.detail.authorized);
   if (flussoAuthorized) {
     loadFlussoLive();
+    refreshPatrimonioLiquidity();
   } else {
     incomes = null; varExp = null;
     renderFlusso();
@@ -1609,9 +1666,13 @@ window.addEventListener('fin-auth-changed', (e) => {
 });
 
 // Ogni volta che una transazione viene registrata o eliminata in Quick Add,
-// aggiorna subito il Flusso Mensile (anche se questa scheda non e' quella attiva).
+// aggiorna subito il Flusso Mensile e la Liquidità nel Patrimonio Netto
+// (anche se queste schede non sono quelle attive in questo momento).
 window.addEventListener('fin-transactions-changed', () => {
-  if (flussoAuthorized) loadFlussoLive();
+  if (flussoAuthorized) {
+    loadFlussoLive();
+    refreshPatrimonioLiquidity();
+  }
 });
 
 function renderFixedRows() {
