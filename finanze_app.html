@@ -277,6 +277,8 @@
   #quickadd-view .log-clear { font-size:0.67rem; color:var(--red); cursor:pointer; }
   #quickadd-view .log { width:100%; max-width:420px; display:flex; flex-direction:column; gap:7px; }
   #quickadd-view .log-item { background:var(--surface); border-radius:12px; padding:11px 15px; display:flex; align-items:center; gap:11px; border:1px solid var(--border); animation:slideIn 0.22s ease; }
+  #quickadd-view .log-del { background:none; border:none; color:var(--muted); font-size:0.95rem; cursor:pointer; padding:4px; flex-shrink:0; opacity:0.7; transition:opacity 0.15s; }
+  #quickadd-view .log-del:hover { opacity:1; color:var(--red); }
   @keyframes slideIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
   #quickadd-view .log-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
   #quickadd-view .log-info { flex:1; }
@@ -412,7 +414,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, getDocs, serverTimestamp, query, where, orderBy, onSnapshot
+  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ===== FIREBASE CONFIG (progetto: dashboard-finanziario) =====
@@ -510,6 +512,7 @@ onAuthStateChanged(auth, (user) => {
     authGate.classList.add('hidden');
     appWrap.classList.add('show');
     startTodayListener();
+    refreshAccountBalances();
     authorized = true;
   } else if (user && user.email !== ALLOWED_EMAIL) {
     deniedMsg.style.display = 'block';
@@ -557,6 +560,42 @@ const accs = [
   { id:'cofrinhos', icon:'🏦', name:'Cofrinhos', bal:'R$ 5.034',    curs:['BRL'] },
   { id:'xp_int',    icon:'🇺🇸', name:'XP Int.',  bal:'$ 132,50',    curs:['USD'] },
 ];
+
+// Saldo dinamico: il valore scritto sopra e' il punto di partenza; da qui in poi
+// il saldo mostrato = punto di partenza + entrate/uscite registrate in Quick Add.
+// Il Revolut (saldo in BTC) resta fisso, non e' tracciabile in valuta.
+function parseBalNumber(str) {
+  const cleaned = str.replace(/[^0-9.,]/g, '');
+  return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+}
+accs.forEach(a => {
+  if (a.id === 'revolut') { a.dynamic = false; return; }
+  a.baseEur = toEur(parseBalNumber(a.bal), a.curs[0]);
+  a.dynamic = true;
+});
+
+async function refreshAccountBalances() {
+  try {
+    const snap = await getDocs(collection(db, 'transactions'));
+    const deltaEur = {};
+    snap.forEach(docSnap => {
+      const d = docSnap.data();
+      const sign = d.type === 'expense' ? -1 : 1;
+      deltaEur[d.account] = (deltaEur[d.account] || 0) + sign * (Number(d.amountEur) || 0);
+    });
+    const symMap = { EUR:'€ ', BRL:'R$ ', USD:'$ ' };
+    accs.forEach(a => {
+      if (!a.dynamic) return;
+      const newEur = a.baseEur + (deltaEur[a.name] || 0);
+      const cur = a.curs[0];
+      const newInCur = cur === 'EUR' ? newEur : newEur * RATES[cur];
+      a.bal = symMap[cur] + newInCur.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+    });
+    renderAccounts();
+  } catch (e) {
+    console.error('Errore aggiornamento saldi conti:', e);
+  }
+}
 
 function renderCats() {
   const cats = type==='expense' ? expCats : incCats;
@@ -661,6 +700,10 @@ window.submitTx = async function submitTx() {
     const sign = type==='expense'?'−':'+';
     showToast(`${sign}${symbol}${amt.toFixed(2).replace('.',',')} registrato ✅`);
 
+    // Aggiorna subito Dashboard (Flusso Mensile) e saldo dei conti
+    window.dispatchEvent(new CustomEvent('fin-transactions-changed'));
+    refreshAccountBalances();
+
     // Reset form
     amountRaw='';
     document.getElementById('amount-text').textContent='0';
@@ -695,8 +738,8 @@ function startTodayListener() {
       return;
     }
     log.innerHTML = '';
-    snap.forEach(doc => {
-      const d = doc.data();
+    snap.forEach(docSnap => {
+      const d = docSnap.data();
       const color = d.type==='expense' ? '#ef4444' : '#10b981';
       const sign = d.type==='expense' ? '−' : '+';
       const curSym = d.currency==='EUR' ? '€' : d.currency==='BRL' ? 'R$' : '$';
@@ -709,6 +752,7 @@ function startTodayListener() {
           <div class="log-meta">${d.category} · ${d.account} · ${d.date}</div>
         </div>
         <div class="log-amount" style="color:${color}">${sign}${curSym}${Number(d.amount).toFixed(2).replace('.',',')}</div>
+        <button class="log-del" onclick="deleteTx('${docSnap.id}')" title="Elimina registrazione">🗑️</button>
       `;
       log.appendChild(item);
     });
@@ -716,6 +760,19 @@ function startTodayListener() {
     console.error('Errore lettura log:', err);
   });
 }
+
+window.deleteTx = async function(id) {
+  if (!confirm("Eliminare questa registrazione? L'operazione non si puo' annullare.")) return;
+  try {
+    await deleteDoc(doc(db, 'transactions', id));
+    showToast('Registrazione eliminata 🗑️');
+    window.dispatchEvent(new CustomEvent('fin-transactions-changed'));
+    refreshAccountBalances();
+  } catch (e) {
+    console.error(e);
+    alert("Errore durante l'eliminazione: " + e.message);
+  }
+};
 
 document.getElementById('clear-label').addEventListener('click', () => showToast('Il log si aggiorna automaticamente dal cloud'));
 
@@ -1549,6 +1606,12 @@ window.addEventListener('fin-auth-changed', (e) => {
     incomes = null; varExp = null;
     renderFlusso();
   }
+});
+
+// Ogni volta che una transazione viene registrata o eliminata in Quick Add,
+// aggiorna subito il Flusso Mensile (anche se questa scheda non e' quella attiva).
+window.addEventListener('fin-transactions-changed', () => {
+  if (flussoAuthorized) loadFlussoLive();
 });
 
 function renderFixedRows() {
