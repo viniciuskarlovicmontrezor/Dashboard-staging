@@ -12,6 +12,7 @@
   .app-tabs {
     display: flex; gap: 10px; justify-content: center;
     padding: 16px 16px 0; background: #0a0c12;
+    position: relative; z-index: 2100; /* sempre sopra l'auth-gate (z-index 2000): la Dashboard non richiede login */
   }
   .app-tab {
     padding: 10px 22px; border-radius: 10px; font-size: 0.85rem; font-weight: 700;
@@ -110,6 +111,53 @@
   #dashboard-view .total-value { font-size: 1.9rem; font-weight: 900; color: #a78bfa; margin-top: 4px; }
   #dashboard-view .total-note { font-size: 0.68rem; color: #475569; margin-top: 4px; }
   #dashboard-view .hint { text-align: center; font-size: 0.7rem; color: #3d4b61; margin-bottom: 10px; }
+
+  /* ===== TRASFERIMENTO TRA VOCI (calcolatore) ===== */
+  #dashboard-view .transfer-wrap { margin-top: 14px; }
+  #dashboard-view .transfer-toggle { width: 100%; background: #1a1d2e; border: 1px solid #2d3148; color: #a78bfa; font-size: 0.8rem; font-weight: 700; padding: 12px 16px; border-radius: 12px; cursor: pointer; text-align: left; }
+  #dashboard-view .transfer-toggle:hover { border-color: #a78bfa; }
+  #dashboard-view .transfer-panel { display: none; background: #1a1d2e; border: 1px solid #2d3148; border-top: none; border-radius: 0 0 12px 12px; padding: 16px 18px; margin-top: -1px; }
+  #dashboard-view .transfer-panel.show { display: block; }
+  #dashboard-view .transfer-hint { font-size: 0.7rem; color: #64748b; margin-bottom: 14px; line-height: 1.5; }
+  #dashboard-view .transfer-row { margin-bottom: 12px; }
+  #dashboard-view .transfer-row > label { display: block; font-size: 0.72rem; color: #94a3b8; margin-bottom: 5px; }
+  #dashboard-view .transfer-row select, #dashboard-view .transfer-row input[type=text], #dashboard-view .transfer-row input[type=number] { width: 100%; background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; color: #e2e8f0; padding: 9px 11px; font-size: 0.8rem; margin-bottom: 6px; }
+  #dashboard-view .transfer-radio { font-size: 0.76rem; color: #cbd5e1; display: block; margin-bottom: 7px; cursor: pointer; }
+  #dashboard-view .transfer-radio input { margin-right: 6px; }
+  #dashboard-view .transfer-bookval { font-size: 0.74rem; color: #94a3b8; }
+  #dashboard-view .transfer-amount-inputs { display: flex; gap: 8px; }
+  #dashboard-view .transfer-amount-inputs > div { flex: 1; display: flex; align-items: center; background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; padding: 0 10px; }
+  #dashboard-view .transfer-amount-inputs .cur-tag { font-size: 0.75rem; color: #64748b; margin-right: 6px; }
+  #dashboard-view .transfer-amount-inputs input { flex: 1; background: transparent; border: none; color: #e2e8f0; padding: 9px 0; font-size: 0.85rem; outline: none; }
+  #dashboard-view .transfer-btn { width: 100%; background: #7c3aed; border: none; color: white; font-weight: 700; padding: 11px; border-radius: 10px; cursor: pointer; font-size: 0.85rem; margin-top: 4px; }
+  #dashboard-view .transfer-btn:hover { background: #8b5cf6; }
+  #dashboard-view .transfer-result { margin-top: 14px; }
+  #dashboard-view .transfer-summary { background: #0f1117; border-radius: 10px; padding: 12px 14px; font-size: 0.78rem; color: #cbd5e1; line-height: 1.7; margin-bottom: 10px; }
+  #dashboard-view .transfer-summary b { color: #f1f5f9; }
+  #dashboard-view .transfer-summary .gain { color: #34d399; } #dashboard-view .transfer-summary .loss { color: #f87171; }
+  #dashboard-view .transfer-code-label { font-size: 0.68rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  #dashboard-view .transfer-copy { font-size: 0.68rem; color: #a78bfa; cursor: pointer; }
+  #dashboard-view .transfer-code { width: 100%; min-height: 190px; background: #05060a; border: 1px solid #2d3148; border-radius: 8px; color: #93c5fd; font-family: 'Consolas', monospace; font-size: 0.72rem; padding: 12px; white-space: pre; overflow: auto; resize: vertical; }
+  #dashboard-view .transfer-apply-btn { width: 100%; background: #059669; border: none; color: white; font-weight: 700; padding: 11px; border-radius: 10px; cursor: pointer; font-size: 0.85rem; margin-top: 10px; }
+  #dashboard-view .transfer-apply-btn:hover { background: #10b981; }
+  #dashboard-view .transfer-override-note { font-size: 0.68rem; color: #fb923c; background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.35); border-radius: 8px; padding: 8px 11px; margin-bottom: 12px; display: none; }
+  #dashboard-view .transfer-override-note.show { display: block; }
+  #dashboard-view .transfer-override-note .transfer-copy { color: #fb923c; text-decoration: underline; }
+  #dashboard-view .transfer-picker { max-height: 230px; overflow-y: auto; background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; margin-bottom: 6px; }
+  #dashboard-view .transfer-pick-cat { font-size: 0.63rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 11px 4px; }
+  #dashboard-view .transfer-pick-row { display: flex; align-items: center; gap: 9px; padding: 8px 11px; cursor: pointer; border-left: 2px solid transparent; transition: all 0.12s; }
+  #dashboard-view .transfer-pick-row:hover { background: #1a1d2e; }
+  #dashboard-view .transfer-pick-row.selected { background: #1e1b4b; border-left-color: #a78bfa; }
+  #dashboard-view .transfer-pick-icon { font-size: 0.95rem; width: 18px; text-align: center; flex-shrink: 0; }
+  #dashboard-view .transfer-pick-text { flex: 1; min-width: 0; }
+  #dashboard-view .transfer-pick-name { font-size: 0.76rem; color: #e2e8f0; }
+  #dashboard-view .transfer-pick-sub { font-size: 0.63rem; color: #64748b; }
+  #dashboard-view .transfer-pick-val { font-size: 0.76rem; font-weight: 700; color: #cbd5e1; white-space: nowrap; }
+  #dashboard-view .transfer-pick-row.new-row { color: #a78bfa; font-size: 0.78rem; font-weight: 600; }
+  #dashboard-view .transfer-pick-empty { padding: 14px; text-align: center; font-size: 0.72rem; color: #475569; }
+  @media (max-width: 640px) {
+    #dashboard-view .transfer-amount-inputs { flex-direction: column; }
+  }
 
   /* ===== FLUSSO ===== */
   #dashboard-view .cards {
@@ -383,6 +431,10 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+// Espone le primitive Firestore al Dashboard (script classico, non-module),
+// che ne ha bisogno per leggere le transazioni di Quick Add nel Flusso Mensile.
+window.__fin = { db, collection, query, where, getDocs };
+
 // ===== AUTH =====
 const authGate = document.getElementById('auth-gate');
 const appWrap = document.getElementById('app-wrap');
@@ -453,10 +505,12 @@ document.getElementById('signout-btn').addEventListener('click', () => signOut(a
 
 onAuthStateChanged(auth, (user) => {
   dbg('onAuthStateChanged: user=' + (user ? user.email : 'null'));
+  let authorized = false;
   if (user && user.email === ALLOWED_EMAIL) {
     authGate.classList.add('hidden');
     appWrap.classList.add('show');
     startTodayListener();
+    authorized = true;
   } else if (user && user.email !== ALLOWED_EMAIL) {
     deniedMsg.style.display = 'block';
     dbg('Email non autorizzata: ' + user.email + ' (attesa: ' + ALLOWED_EMAIL + ')');
@@ -467,6 +521,8 @@ onAuthStateChanged(auth, (user) => {
     authGate.classList.remove('hidden');
     appWrap.classList.remove('show');
   }
+  // Il Dashboard (Flusso Mensile) ascolta questo evento per sapere se puo' leggere Firestore
+  window.dispatchEvent(new CustomEvent('fin-auth-changed', { detail: { authorized } }));
 });
 
 // ===== STATE =====
@@ -735,6 +791,52 @@ renderCats(); renderAccounts();
     <div class="total-value">€ 315.210</div>
     <div class="total-note">Immobili · Precatório · Investimenti · Liquidità</div>
   </div>
+
+  <!-- ===== CALCOLATORE TRASFERIMENTO TRA CATEGORIE ===== -->
+  <div class="transfer-wrap">
+    <button class="transfer-toggle" onclick="toggleTransfer()">🔁 Trasferisci valore tra categorie (calcolatore)</button>
+    <div class="transfer-panel" id="transfer-panel">
+      <div class="transfer-override-note" id="transfer-override-note">
+        🧪 Stai vedendo dati modificati in locale (test in ambiente dev), non ancora nel codice sorgente. <span class="transfer-copy" onclick="resetOverride()">Ripristina dati originali</span>
+      </div>
+      <p class="transfer-hint">Es: vendi una casa per un valore diverso da quello registrato e vuoi spostare il ricavato in un conto di liquidità. Scegli origine, valore e destinazione: il calcolatore ti mostra il codice da incollare nel file, e puoi anche applicarlo subito qui per fare una prova visiva.</p>
+
+      <div class="transfer-row">
+        <label>Da (bene/conto di origine)</label>
+        <div class="transfer-picker" id="tr-source-picker"></div>
+        <div class="transfer-bookval">Valore contabile attuale: <b id="tr-bookval">—</b></div>
+      </div>
+
+      <div class="transfer-row">
+        <label class="transfer-radio"><input type="radio" name="tr-mode" value="full" checked> Vendita/chiusura completa (rimuove il bene/conto di origine)</label>
+        <label class="transfer-radio"><input type="radio" name="tr-mode" value="partial"> Trasferimento parziale (riduce il valore del bene/conto di origine)</label>
+      </div>
+
+      <div class="transfer-row">
+        <label>Valore trasferito / incassato</label>
+        <div class="transfer-amount-inputs">
+          <div><span class="cur-tag">€</span><input type="number" id="tr-amount-eur" placeholder="0" oninput="syncAmount('eur')"></div>
+          <div><span class="cur-tag">R$</span><input type="number" id="tr-amount-brl" placeholder="0" oninput="syncAmount('brl')"></div>
+        </div>
+      </div>
+
+      <div class="transfer-row">
+        <label>A (bene/conto di destinazione)</label>
+        <div class="transfer-picker" id="tr-dest-picker"></div>
+      </div>
+
+      <div class="transfer-row" id="tr-new-fields" style="display:none;">
+        <label>Nuovo bene/conto — in quale categoria?</label>
+        <select id="tr-new-cat"></select>
+        <input type="text" id="tr-new-name" placeholder="Nome (es. Wise EUR, Nuovo conto...)">
+        <input type="text" id="tr-new-sub" placeholder="Sottotitolo (opzionale)">
+      </div>
+
+      <button class="transfer-btn" onclick="calcTransfer()">Calcola modifiche</button>
+
+      <div class="transfer-result" id="transfer-result"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ===== TAB 2: FLUSSO ===== -->
@@ -743,23 +845,23 @@ renderCats(); renderAccounts();
   <div class="cards">
     <div class="card">
       <div class="card-label">✅ Entrate</div>
-      <div class="card-val green">+€ 1.003</div>
-      <div class="card-sub">4 affitti SP</div>
+      <div class="card-val green" id="card-inc-val">…</div>
+      <div class="card-sub" id="card-inc-sub">Verifica accesso in corso…</div>
     </div>
     <div class="card">
       <div class="card-label">🔴 Uscite Fisse</div>
-      <div class="card-val red">−€ 1.765</div>
+      <div class="card-val red" id="card-fix-val">…</div>
       <div class="card-sub">Affitto + utenze + sport</div>
     </div>
     <div class="card">
       <div class="card-label">🛒 Spese Variabili</div>
-      <div class="card-val orange">−€ 0,00</div>
-      <div class="card-sub">Luglio 2026 · 0 voci</div>
+      <div class="card-val orange" id="card-var-val">…</div>
+      <div class="card-sub" id="card-var-sub">Verifica accesso in corso…</div>
     </div>
     <div class="card">
       <div class="card-label">⚖️ Saldo Netto</div>
-      <div class="card-val red">−€ 739</div>
-      <div class="card-sub">Deficit mensile</div>
+      <div class="card-val red" id="card-net-val">…</div>
+      <div class="card-sub" id="card-net-sub">Verifica accesso in corso…</div>
     </div>
   </div>
 
@@ -768,7 +870,7 @@ renderCats(); renderAccounts();
     <div class="section-card">
       <div class="section-title">
         <span class="green">✅ ENTRATE</span>
-        <span class="section-total green">+€ 1.009,60</span>
+        <span class="section-total green" id="income-total">…</span>
       </div>
       <div class="flow-row-item" id="income-rows"></div>
     </div>
@@ -776,7 +878,7 @@ renderCats(); renderAccounts();
     <div class="section-card">
       <div class="section-title">
         <span class="red">🔴 COSTI FISSI</span>
-        <span class="section-total red">−€ 1.764,64</span>
+        <span class="section-total red" id="fixed-total">…</span>
       </div>
       <div class="flow-row-item" id="expense-rows"></div>
     </div>
@@ -784,7 +886,7 @@ renderCats(); renderAccounts();
     <div class="section-card" style="border-color:#fb923c44;">
       <div class="section-title">
         <span class="orange">🛒 SPESE VARIABILI</span>
-        <span class="section-total orange">−€ 0,00</span>
+        <span class="section-total orange" id="var-total">…</span>
       </div>
       <div class="flow-row-item" id="var-rows"></div>
     </div>
@@ -800,12 +902,12 @@ renderCats(); renderAccounts();
   <div class="deficit-box">
     <div class="deficit-icon">⚠️</div>
     <div class="deficit-text">
-      <div class="deficit-lbl">DEFICIT MENSILE CORRENTE</div>
-      <div class="deficit-val">−€ 739,95</div>
-      <div class="deficit-note">Luglio 2026 iniziato · Spese variabili: €0 · Liquidità: € 5.388 · ❄️ Rata condiz. fino a ott 2026</div>
+      <div class="deficit-lbl">SALDO MENSILE CORRENTE</div>
+      <div class="deficit-val" id="deficit-val">…</div>
+      <div class="deficit-note" id="deficit-note">Verifica accesso in corso…</div>
     </div>
     <div class="deficit-months">
-      <div class="deficit-months-val">~7 mesi</div>
+      <div class="deficit-months-val" id="deficit-months-val">—</div>
       <div class="deficit-months-lbl">autonomia con<br>liquidità attuale</div>
     </div>
   </div>
@@ -865,7 +967,21 @@ const categories = [
   }
 ];
 
-const totalPat = categories.reduce((s,c) => s+c.value, 0);
+const ORIGINAL_CATEGORIES = JSON.parse(JSON.stringify(categories));
+
+(function loadOverride(){
+  try {
+    const saved = localStorage.getItem('patrimonio_override');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      categories.length = 0;
+      parsed.forEach(c => categories.push(c));
+    }
+  } catch(e) { console.warn('Override non valido, ignorato:', e); }
+})();
+
+let totalPat = categories.reduce((s,c) => s+c.value, 0);
+function recomputeTotals() { totalPat = categories.reduce((s,c) => s+c.value, 0); }
 let activeIdx = null;
 
 /* Donut */
@@ -969,17 +1085,21 @@ drawDonut();
 
 /* Legend */
 const legendEl = document.getElementById('legend');
-categories.forEach((d,i) => {
-  const pct = ((d.value/totalPat)*100).toFixed(1);
-  const el = document.createElement('div');
-  el.className='legend-item'; el.id='leg-'+i;
-  el.innerHTML=`<div class="dot" style="background:${d.color}"></div>
-    <div class="leg-text"><div class="leg-label">${d.label}</div>
-    <div class="leg-pct">${d.sub} · <b style="color:#a78bfa">${pct}%</b></div></div>
-    <div class="leg-val">${'€ '+d.value.toLocaleString('it-IT')}</div>`;
-  el.addEventListener('click',()=>toggleDetail(i));
-  legendEl.appendChild(el);
-});
+function renderLegend() {
+  legendEl.innerHTML = '';
+  categories.forEach((d,i) => {
+    const pct = ((d.value/totalPat)*100).toFixed(1);
+    const el = document.createElement('div');
+    el.className='legend-item'; el.id='leg-'+i;
+    el.innerHTML=`<div class="dot" style="background:${d.color}"></div>
+      <div class="leg-text"><div class="leg-label">${d.label}</div>
+      <div class="leg-pct">${d.sub} · <b style="color:#a78bfa">${pct}%</b></div></div>
+      <div class="leg-val">${'€ '+d.value.toLocaleString('it-IT')}</div>`;
+    el.addEventListener('click',()=>toggleDetail(i));
+    legendEl.appendChild(el);
+  });
+}
+renderLegend();
 
 canvas.addEventListener('click', e => {
   const rect=canvas.getBoundingClientRect();
@@ -1051,17 +1171,325 @@ function closeDetail(){
   activeIdx=null; drawDonut();
   document.querySelectorAll('#dashboard-view .legend-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('detail').className='detail-panel';
-  document.getElementById('center-val').textContent='€ 315.210';
+  renderTotal();
   document.getElementById('center-sub').textContent='patrimonio totale';
 }
 
+/* Totale sempre calcolato da "categories", mai scritto a mano nell'HTML */
+function renderTotal() {
+  document.getElementById('center-val').textContent = fmt(totalPat);
+  document.querySelector('#dashboard-view .total-value').textContent = fmt(totalPat);
+}
+renderTotal();
+
+/* ===== CALCOLATORE TRASFERIMENTO TRA BENI/CONTI ===== */
+const RATE_BRL = 5.92, RATE_USD = 1.1371;
+const round2 = n => Math.round(n*100)/100;
+let trSourceIdx = null, trDestSel = null, pendingChange = null;
+
+function flattenItems() {
+  const list = [];
+  categories.forEach((cat, ci) => {
+    cat.items.forEach((it, ii) => list.push({ ci, ii, cat, item: it }));
+  });
+  return list;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateOverrideNote() {
+  const note = document.getElementById('transfer-override-note');
+  if (!note) return;
+  let hasOverride = false;
+  try { hasOverride = !!localStorage.getItem('patrimonio_override'); } catch(e) { /* storage non disponibile, ignora */ }
+  note.classList.toggle('show', hasOverride);
+}
+
+window.toggleTransfer = function() {
+  const panel = document.getElementById('transfer-panel');
+  const isShow = panel.classList.toggle('show');
+  if (isShow) populateTransferPickers();
+};
+
+function populateTransferPickers() {
+  const flat = flattenItems();
+  if (trSourceIdx === null || trSourceIdx >= flat.length) trSourceIdx = flat.length ? 0 : null;
+  if (typeof trDestSel === 'number' && trDestSel >= flat.length) trDestSel = null;
+  document.getElementById('tr-new-cat').innerHTML = categories.map((c,ci)=>`<option value="${ci}">${escHtml(c.label)}</option>`).join('');
+  renderSourcePicker();
+  renderDestPicker();
+  window.updateBookValue();
+  updateDestFields();
+  updateOverrideNote();
+}
+
+function pickRowHtml(f) {
+  return `<span class="transfer-pick-icon">${f.item.icon}</span>
+    <div class="transfer-pick-text"><div class="transfer-pick-name">${escHtml(f.item.name)}</div><div class="transfer-pick-sub">${escHtml(f.item.sub||'')}</div></div>
+    <div class="transfer-pick-val">${fmt(f.item.eur)}</div>`;
+}
+
+function renderSourcePicker() {
+  const flat = flattenItems();
+  const el = document.getElementById('tr-source-picker');
+  el.innerHTML = '';
+  if (!flat.length) { el.innerHTML = '<div class="transfer-pick-empty">Nessun bene/conto disponibile</div>'; return; }
+  let lastCat = null;
+  flat.forEach((f, idx) => {
+    if (f.cat.label !== lastCat) {
+      lastCat = f.cat.label;
+      const h = document.createElement('div'); h.className='transfer-pick-cat'; h.textContent = f.cat.label;
+      el.appendChild(h);
+    }
+    const row = document.createElement('div');
+    row.className = 'transfer-pick-row' + (trSourceIdx === idx ? ' selected' : '');
+    row.innerHTML = pickRowHtml(f);
+    row.onclick = () => window.selectSource(idx);
+    el.appendChild(row);
+  });
+}
+
+function renderDestPicker() {
+  const flat = flattenItems();
+  const el = document.getElementById('tr-dest-picker');
+  el.innerHTML = '';
+  let lastCat = null;
+  flat.forEach((f, idx) => {
+    if (idx === trSourceIdx) return;
+    if (f.cat.label !== lastCat) {
+      lastCat = f.cat.label;
+      const h = document.createElement('div'); h.className='transfer-pick-cat'; h.textContent = f.cat.label;
+      el.appendChild(h);
+    }
+    const row = document.createElement('div');
+    row.className = 'transfer-pick-row' + (trDestSel === idx ? ' selected' : '');
+    row.innerHTML = pickRowHtml(f);
+    row.onclick = () => window.selectDest(idx);
+    el.appendChild(row);
+  });
+  const newRow = document.createElement('div');
+  newRow.className = 'transfer-pick-row new-row' + (trDestSel === 'new' ? ' selected' : '');
+  newRow.innerHTML = `<span class="transfer-pick-icon">➕</span><div class="transfer-pick-text"><div class="transfer-pick-name">Nuovo bene/conto...</div></div>`;
+  newRow.onclick = () => window.selectDest('new');
+  el.appendChild(newRow);
+}
+
+window.selectSource = function(idx) {
+  trSourceIdx = idx;
+  if (trDestSel === idx) trDestSel = null;
+  renderSourcePicker();
+  renderDestPicker();
+  window.updateBookValue();
+};
+
+window.selectDest = function(val) {
+  trDestSel = val;
+  renderDestPicker();
+  updateDestFields();
+};
+
+window.updateBookValue = function() {
+  const flat = flattenItems();
+  const f = trSourceIdx !== null ? flat[trSourceIdx] : null;
+  document.getElementById('tr-bookval').textContent = f ? fmt(f.item.eur) : '—';
+};
+
+function updateDestFields() {
+  document.getElementById('tr-new-fields').style.display = trDestSel === 'new' ? 'block' : 'none';
+}
+
+window.syncAmount = function(from) {
+  const eurEl = document.getElementById('tr-amount-eur');
+  const brlEl = document.getElementById('tr-amount-brl');
+  if (from === 'eur') {
+    const v = parseFloat(eurEl.value);
+    brlEl.value = isNaN(v) ? '' : round2(v*RATE_BRL);
+  } else {
+    const v = parseFloat(brlEl.value);
+    eurEl.value = isNaN(v) ? '' : round2(v/RATE_BRL);
+  }
+};
+
+function serializeItem(it) {
+  let s = `{ icon:'${it.icon}', name:'${it.name}', sub:'${it.sub}', eur:${it.eur}`;
+  if (it.brl !== undefined) s += `, brl:${it.brl}`;
+  if (it.usd !== undefined) s += `, usd:${it.usd}`;
+  s += ' }';
+  return s;
+}
+
+window.calcTransfer = function() {
+  const flat = flattenItems();
+  const src = trSourceIdx !== null ? flat[trSourceIdx] : null;
+  const mode = document.querySelector('input[name="tr-mode"]:checked').value;
+  const amount = parseFloat(document.getElementById('tr-amount-eur').value);
+  const resultEl = document.getElementById('transfer-result');
+  pendingChange = null;
+
+  if (!src || isNaN(amount) || amount <= 0) {
+    resultEl.innerHTML = '<div class="transfer-summary"><span class="loss">⚠️ Seleziona un bene/conto di origine e inserisci un valore trasferito valido.</span></div>';
+    return;
+  }
+  if (trDestSel === null) {
+    resultEl.innerHTML = '<div class="transfer-summary"><span class="loss">⚠️ Seleziona un bene/conto di destinazione.</span></div>';
+    return;
+  }
+  if (trDestSel !== 'new' && trDestSel === trSourceIdx) {
+    resultEl.innerHTML = '<div class="transfer-summary"><span class="loss">⚠️ Origine e destinazione non possono essere lo stesso bene/conto.</span></div>';
+    return;
+  }
+
+  const bookVal = src.item.eur;
+  const catDeltas = new Map();
+  const addDelta = (label, d) => catDeltas.set(label, round2((catDeltas.get(label)||0) + d));
+
+  let srcBlock, srcRemove = false, srcNewItem = null;
+  if (mode === 'full') {
+    addDelta(src.cat.label, -bookVal);
+    srcBlock = `RIMUOVI questa riga dall'array items di "${src.cat.label}":\n${serializeItem(src.item)}`;
+    srcRemove = true;
+  } else {
+    if (amount > bookVal) {
+      resultEl.innerHTML = '<div class="transfer-summary"><span class="loss">⚠️ Il trasferimento parziale non può superare il valore contabile del bene/conto di origine.</span></div>';
+      return;
+    }
+    addDelta(src.cat.label, -amount);
+    srcNewItem = Object.assign({}, src.item, { eur: round2(src.item.eur - amount) });
+    if (src.item.brl !== undefined) srcNewItem.brl = Math.round(src.item.brl - amount*RATE_BRL);
+    if (src.item.usd !== undefined) srcNewItem.usd = Math.round(src.item.usd - amount*RATE_USD);
+    srcBlock = `SOSTITUISCI questa riga nell'array items di "${src.cat.label}":\nDA:  ${serializeItem(src.item)}\nA:   ${serializeItem(srcNewItem)}`;
+  }
+
+  let dst = null, dstBlock, dstCatLabel, dstIsNew = false, dstCatIdx = null, dstNewItemObj = null, dstNewValue = null;
+  if (trDestSel === 'new') {
+    dstCatIdx = parseInt(document.getElementById('tr-new-cat').value);
+    const destCat = categories[dstCatIdx];
+    const name = document.getElementById('tr-new-name').value.trim() || 'Nuovo bene/conto';
+    const sub = document.getElementById('tr-new-sub').value.trim() || '';
+    dstCatLabel = destCat.label;
+    addDelta(dstCatLabel, amount);
+    dstIsNew = true;
+    dstNewItemObj = { icon:'🏦', name, sub, eur: round2(amount), brl: Math.round(amount*RATE_BRL) };
+    dstBlock = `AGGIUNGI questa riga nell'array items di "${dstCatLabel}":\n${serializeItem(dstNewItemObj)},`;
+  } else {
+    dst = flat[trDestSel];
+    dstCatLabel = dst.cat.label;
+    addDelta(dstCatLabel, amount);
+    dstNewValue = Object.assign({}, dst.item, { eur: round2(dst.item.eur + amount) });
+    if (dst.item.brl !== undefined) dstNewValue.brl = Math.round(dst.item.brl + amount*RATE_BRL);
+    if (dst.item.usd !== undefined) dstNewValue.usd = Math.round(dst.item.usd + amount*RATE_USD);
+    dstBlock = `SOSTITUISCI questa riga nell'array items di "${dstCatLabel}":\nDA:  ${serializeItem(dst.item)}\nA:   ${serializeItem(dstNewValue)}`;
+  }
+
+  const diff = mode === 'full' ? round2(amount - bookVal) : 0;
+  const newTotal = round2(totalPat + diff);
+
+  let catBlocks = '';
+  let step = 1;
+  categories.forEach(cat => {
+    const d = catDeltas.get(cat.label);
+    if (d) {
+      const newVal = round2(cat.value + d);
+      catBlocks += `${step}) Categoria "${cat.label}"\nCambia:  value:${cat.value},\nIn:      value:${newVal},\n\n`;
+      step++;
+    }
+  });
+  const itemBlocks = `${step}) ${srcBlock}\n\n${step+1}) ${dstBlock}`;
+
+  const diffClass = diff > 0 ? 'gain' : diff < 0 ? 'loss' : '';
+  const diffSign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+
+  pendingChange = {
+    srcCatIdx: src.ci, srcItemIdx: src.ii, srcRemove, srcNewItem,
+    dstIsNew, dstCatIdx: dstIsNew ? dstCatIdx : dst.ci, dstItemIdx: dstIsNew ? null : dst.ii,
+    dstNewItemObj, dstNewValue,
+    catDeltas: Array.from(catDeltas.entries())
+  };
+
+  resultEl.innerHTML = `
+    <div class="transfer-summary">
+      Valore contabile origine: <b>${fmt(bookVal)}</b><br>
+      Valore trasferito/incassato: <b>${fmt(amount)}</b><br>
+      ${mode==='full' ? `Guadagno/perdita sulla vendita: <b class="${diffClass}">${diffSign}${fmt(Math.abs(diff))}</b><br>` : ''}
+      Nuovo patrimonio netto totale: <b>${fmt(newTotal)}</b>
+    </div>
+    <div class="transfer-code-label"><span>Codice da incollare in "categories"</span><span class="transfer-copy" onclick="copyTransferCode()">📋 Copia</span></div>
+    <textarea class="transfer-code" id="transfer-code" readonly>${escHtml(catBlocks + itemBlocks)}</textarea>
+    <button class="transfer-apply-btn" onclick="applyTransfer()">💾 Salva e applica modifiche (test in questo browser)</button>
+  `;
+};
+
+window.applyTransfer = function() {
+  if (!pendingChange) return;
+  const pc = pendingChange;
+
+  if (pc.dstIsNew) {
+    categories[pc.dstCatIdx].items.push(pc.dstNewItemObj);
+  } else {
+    categories[pc.dstCatIdx].items[pc.dstItemIdx] = pc.dstNewValue;
+  }
+
+  if (pc.srcRemove) {
+    categories[pc.srcCatIdx].items.splice(pc.srcItemIdx, 1);
+  } else {
+    categories[pc.srcCatIdx].items[pc.srcItemIdx] = pc.srcNewItem;
+  }
+
+  pc.catDeltas.forEach(([label, d]) => {
+    const cat = categories.find(c => c.label === label);
+    if (cat) cat.value = round2(cat.value + d);
+  });
+  recomputeTotals();
+
+  try { localStorage.setItem('patrimonio_override', JSON.stringify(categories)); } catch(e) { console.warn('Impossibile salvare in localStorage:', e); }
+
+  drawDonut();
+  renderLegend();
+  renderTotal();
+  closeDetail();
+
+  pendingChange = null;
+  trSourceIdx = null; trDestSel = null;
+  document.getElementById('tr-amount-eur').value = '';
+  document.getElementById('tr-amount-brl').value = '';
+  document.getElementById('tr-new-name').value = '';
+  document.getElementById('tr-new-sub').value = '';
+  populateTransferPickers();
+  document.getElementById('transfer-result').innerHTML = '<div class="transfer-summary"><span class="gain">✅ Applicato e salvato in questo browser (test in ambiente dev). Il codice sopra resta valido per renderlo permanente nel file.</span></div>';
+  updateOverrideNote();
+};
+
+window.resetOverride = function() {
+  try { localStorage.removeItem('patrimonio_override'); } catch(e) { console.warn('Impossibile rimuovere da localStorage:', e); }
+  categories.length = 0;
+  JSON.parse(JSON.stringify(ORIGINAL_CATEGORIES)).forEach(c => categories.push(c));
+  recomputeTotals();
+  drawDonut();
+  renderLegend();
+  renderTotal();
+  closeDetail();
+  trSourceIdx = null; trDestSel = null; pendingChange = null;
+  populateTransferPickers();
+  document.getElementById('transfer-result').innerHTML = '';
+  updateOverrideNote();
+};
+
+window.copyTransferCode = function() {
+  const el = document.getElementById('transfer-code');
+  el.select();
+  navigator.clipboard.writeText(el.value).then(()=>{
+    const label = document.querySelector('#dashboard-view .transfer-copy');
+    if (!label) return;
+    const orig = label.textContent;
+    label.textContent = '✅ Copiato!';
+    setTimeout(()=>{ label.textContent = orig; }, 1500);
+  });
+};
+
 /* ===== FLUSSO DATA ===== */
-const incomes = [
-  {icon:'🏠',name:'Rua Dr. Nicolau Defina, 167',sub:'Jardim da Saúde · SP',eur:177.40,brl:1050},
-  {icon:'🏠',name:'Av. Leonardo da Vinci, 670',sub:'Vila Guarani · SP',eur:349.66,brl:2070},
-  {icon:'🏠',name:'Av. Antônio Severiano, 169',sub:'Aviação · SP',eur:256.76,brl:1520},
-  {icon:'🏠',name:'Rua Rodolfo Garcia, 167',sub:'Jabaquara · SP',eur:219.59,brl:1300},
-];
+/* Costi Fissi: restano un elenco mantenuto a mano (abbonamenti/affitti ricorrenti noti) */
 const fixedExp = [
   {icon:'🏠',name:'Affitto Via Ebro 9, Ap.23',sub:'Milano',eur:1300,cat:'Casa'},
   {icon:'💪',name:'Virgin Active Palestra',sub:'Abbonamento mensile',eur:160,cat:'Salute'},
@@ -1072,129 +1500,211 @@ const fixedExp = [
   {icon:'🏝️',name:'Casa Florianópolis',sub:'IPTU + Rampa + CELESC',eur:25.84,cat:'Casa BR'},
   {icon:'❄️',name:'Condizionatore portatile (rata)',sub:'5 rate · giu–ott 2026 · €359,99 totale',eur:72,cat:'Casa'},
 ];
-// ── RIEPILOGO GIUGNO 2026 (chiuso) ──
-const giugnoExp = [
-  {icon:'☕',name:'Caffè',sub:'24/06 · Isybank',eur:3,cat:'Svago'},
-  {icon:'🍽️',name:'Cena',sub:'24/06 · Isybank',eur:12,cat:'Ristoranti'},
-  {icon:'🧸',name:'Funko Ging Freecss',sub:'24/06 · Isybank',eur:12.30,cat:'Svago'},
-  {icon:'🛒',name:'Spesa',sub:'25/06 · Isybank',eur:33.25,cat:'Alimentari'},
-  {icon:'😷',name:'Mascherine',sub:'26/06 · Isybank',eur:2.25,cat:'Salute'},
-  {icon:'💊',name:'Medicina pollice',sub:'26/06 · Isybank',eur:23.65,cat:'Salute'},
-  {icon:'🦴',name:'Tutore pollice',sub:'26/06 · Isybank',eur:36,cat:'Salute'},
-  {icon:'🍽️',name:'Pranzo collaborazione',sub:'26/06 · Isybank',eur:10.40,cat:'Ristoranti'},
-  {icon:'🍦',name:'Gelati',sub:'26/06 · Isybank',eur:8,cat:'Svago'},
-  {icon:'🍽️',name:'Pranzo',sub:'27/06 · Isybank',eur:6.20,cat:'Ristoranti'},
-  {icon:'☕',name:'Caffè',sub:'27/06 · Isybank',eur:1.50,cat:'Svago'},
-  {icon:'🛍️',name:'Amazon Prime extra',sub:'27/06 · Isybank',eur:4.99,cat:'Software'},
-  {icon:'🚌',name:'Trasporto',sub:'28/06 · Isybank',eur:2.20,cat:'Trasporti'},
-  {icon:'🎉',name:'Serata',sub:'28/06 · Isybank',eur:15.50,cat:'Svago'},
-  {icon:'📦',name:'Amazon Ad Free',sub:'28/06 · Isybank',eur:2,cat:'Software'},
-  {icon:'🛵',name:'Cena Glovo',sub:'28/06 · Isybank',eur:18.99,cat:'Ristoranti'},
-  {icon:'🛵',name:'Cena Glovo',sub:'28/06 · Isybank',eur:20,cat:'Ristoranti'},
-  {icon:'☕',name:'Caffè',sub:'29/06 · Isybank',eur:1.50,cat:'Svago'},
-  {icon:'⚡',name:'Bevanda energetica',sub:'29/06 · Isybank',eur:2.20,cat:'Svago'},
-  {icon:'🚌',name:'Trasporto',sub:'29/06 · Isybank',eur:2.20,cat:'Trasporti'},
-  {icon:'🍽️',name:'Cena',sub:'29/06 · Isybank',eur:15,cat:'Ristoranti'},
-  {icon:'☕',name:'Caffè',sub:'29/06 · Isybank',eur:1.10,cat:'Svago'},
-  {icon:'🍽️',name:'Pranzo',sub:'29/06 · Isybank',eur:7.90,cat:'Ristoranti'},
-  {icon:'🧴',name:'Deodorante',sub:'29/06 · Isybank',eur:3.98,cat:'Salute'},
-  {icon:'🥤',name:'Proteine',sub:'29/06 · Isybank',eur:6.94,cat:'Alimentari'},
-  {icon:'🛒',name:'Spesa',sub:'30/06 · Isybank',eur:12.94,cat:'Alimentari'},
-  {icon:'🍽️',name:'Pranzo e cena',sub:'30/06 · Isybank',eur:12.40,cat:'Ristoranti'},
-];
-// ── LUGLIO 2026 (in corso) ──
-const varExp = [];
-
-const totalInc = incomes.reduce((s,i)=>s+i.eur,0);
 const totalFix = fixedExp.reduce((s,i)=>s+i.eur,0);
-const totalVar = varExp.reduce((s,i)=>s+i.eur,0);
-const totalExp2 = totalFix+totalVar;
 
-/* Income rows */
-const incRowEl = document.getElementById('income-rows');
-const maxInc = Math.max(...incomes.map(i=>i.eur));
-incomes.forEach(item=>{
-  const pct=((item.eur/totalInc)*100).toFixed(1);
-  const bW=((item.eur/maxInc)*100).toFixed(1);
-  const el=document.createElement('div');
-  el.className='flow-item';
-  el.innerHTML=`<div class="fi-icon">${item.icon}</div>
-    <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
-    <div class="bar-track"><div class="bar-fill" style="width:0%;background:#34d399" data-w="${bW}%"></div></div></div>
-    <div class="fi-right"><div class="fi-val green">+${fmt(item.eur)}</div>
-    <div class="fi-pct">${pct}% entrate</div></div>`;
-  incRowEl.appendChild(el);
+/* Entrate e Spese Variabili arrivano dal vivo dalle transazioni Quick Add del mese corrente.
+   null = stato non ancora determinato (in attesa di autenticazione), [] = determinato e vuoto. */
+let incomes = null;
+let varExp = null;
+let flussoAuthorized = null;
+
+const nowFlusso = new Date();
+const monthKeyFlusso = `${nowFlusso.getFullYear()}-${String(nowFlusso.getMonth()+1).padStart(2,'0')}`;
+const monthLabelFlusso = nowFlusso.toLocaleDateString('it-IT', { month:'long', year:'numeric' });
+
+function extractIcon(catStr) { return catStr ? (catStr.split(' ')[0] || '📦') : '📦'; }
+function stripIcon(catStr) { return catStr ? catStr.split(' ').slice(1).join(' ') : ''; }
+
+async function loadFlussoLive() {
+  if (!flussoAuthorized || !window.__fin) return;
+  try {
+    const { db, collection, query, where, getDocs } = window.__fin;
+    const q = query(collection(db, 'transactions'), where('month', '==', monthKeyFlusso));
+    const snap = await getDocs(q);
+    const inc = [], exp = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      const row = {
+        icon: extractIcon(d.category),
+        name: d.description || stripIcon(d.category) || 'Transazione',
+        sub: `${stripIcon(d.category)} · ${d.account || ''} · ${d.date || ''}`,
+        eur: Number(d.amountEur) || 0
+      };
+      if (d.type === 'income') inc.push(row); else exp.push(row);
+    });
+    incomes = inc;
+    varExp = exp;
+  } catch (e) {
+    console.error('Errore lettura Flusso Mensile da Firestore:', e);
+    incomes = []; varExp = [];
+  }
+  renderFlusso();
+}
+
+window.addEventListener('fin-auth-changed', (e) => {
+  flussoAuthorized = !!(e.detail && e.detail.authorized);
+  if (flussoAuthorized) {
+    loadFlussoLive();
+  } else {
+    incomes = null; varExp = null;
+    renderFlusso();
+  }
 });
 
-/* Expense rows */
-const expRowEl = document.getElementById('expense-rows');
-const varRowEl = document.getElementById('var-rows');
-const maxFixed = Math.max(...fixedExp.map(i=>i.eur));
-const maxVar = Math.max(...varExp.map(i=>i.eur));
-
-fixedExp.forEach(item=>{
-  const pct=((item.eur/totalFix)*100).toFixed(1);
-  const bW=((item.eur/maxFixed)*100).toFixed(1);
-  const el=document.createElement('div'); el.className='flow-item';
-  el.innerHTML=`<div class="fi-icon">${item.icon}</div>
-    <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
-    <div class="bar-track"><div class="bar-fill" style="width:0%;background:#f87171" data-w="${bW}%"></div></div></div>
-    <div class="fi-right"><div class="fi-val red">−${fmt(item.eur)}</div>
-    <div class="fi-pct">${pct}% fissi</div></div>`;
-  expRowEl.appendChild(el);
-});
-
-varExp.forEach(item=>{
-  const pct=((item.eur/totalVar)*100).toFixed(1);
-  const bW=((item.eur/maxVar)*100).toFixed(1);
-  const el=document.createElement('div'); el.className='flow-item';
-  el.innerHTML=`<div class="fi-icon">${item.icon}</div>
-    <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
-    <div class="bar-track"><div class="bar-fill" style="width:0%;background:#fb923c" data-w="${bW}%"></div></div></div>
-    <div class="fi-right"><div class="fi-val orange">−${fmt(item.eur)}</div>
-    <div class="fi-pct">${pct}% var.</div></div>`;
-  varRowEl.appendChild(el);
-});
-
-/* Waterfall */
-const wfData = [
-  {label:'✅ Entrate affitti', val:totalInc, color:'#34d399'},
-  {label:'🏠 Affitto Via Ebro', val:-1300, color:'#f87171'},
-  {label:'💪 Virgin Active', val:-160, color:'#f87171'},
-  {label:'⚡ A2A Luce', val:-90, color:'#f87171'},
-  {label:'📱 TIM Fibra + Tel.', val:-38.80, color:'#f87171'},
-  {label:'💻 Abbonamenti SW', val:-53, color:'#f87171'},
-  {label:'🔥 A2A Gas', val:-25, color:'#f87171'},
-  {label:'🏝️ Casa Florianópolis', val:-25.84, color:'#f87171'},
-  {label:'❄️ Condizionatore (rata)', val:-72, color:'#f87171'},
-  {label:'🛒 Spese variabili luglio', val:0, color:'#fb923c'},
-  {label:'⚖️ Saldo Finale', val:totalInc-totalExp2, color:'#f87171'},
-];
-const maxWF = totalInc;
-const wfEl = document.getElementById('waterfall');
-wfData.forEach(d=>{
-  const w=Math.abs((d.val/maxWF)*100).toFixed(1);
-  const sign=d.val>0?'+':'−';
-  const row=document.createElement('div'); row.className='wf-row';
-  row.innerHTML=`<div class="wf-label">${d.label}</div>
-    <div class="wf-track"><div class="wf-bar" style="width:0%;background:${d.color}" data-w="${w}%">${w>10?sign+fmt(d.val):''}</div></div>
-    <div class="wf-val" style="color:${d.color}">${sign+fmt(d.val)}</div>`;
-  wfEl.appendChild(row);
-});
-
-/* Animate */
-setTimeout(()=>{
-  document.querySelectorAll('#dashboard-view .bar-fill, #dashboard-view .wf-bar').forEach(b=>{
-    if(b.dataset.w) b.style.width=b.dataset.w;
+function renderFixedRows() {
+  const expRowEl = document.getElementById('expense-rows');
+  expRowEl.innerHTML = '';
+  const maxFixed = Math.max(...fixedExp.map(i=>i.eur));
+  fixedExp.forEach(item=>{
+    const pct=((item.eur/totalFix)*100).toFixed(1);
+    const bW=((item.eur/maxFixed)*100).toFixed(1);
+    const el=document.createElement('div'); el.className='flow-item';
+    el.innerHTML=`<div class="fi-icon">${item.icon}</div>
+      <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
+      <div class="bar-track"><div class="bar-fill" style="width:0%;background:#f87171" data-w="${bW}%"></div></div></div>
+      <div class="fi-right"><div class="fi-val red">−${fmt(item.eur)}</div>
+      <div class="fi-pct">${pct}% fissi</div></div>`;
+    expRowEl.appendChild(el);
   });
-},150);
+}
 
-/* Tooltip */
-const tip=document.getElementById('tooltip');
-document.querySelectorAll('#dashboard-view .flow-item').forEach(el=>{
-  el.addEventListener('mousemove',e=>{ tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-10)+'px'; });
-  el.addEventListener('mouseleave',()=>tip.style.display='none');
-});
+function renderWaterfall(totalIncOrNull, totalVar, saldo) {
+  const wfEl = document.getElementById('waterfall');
+  wfEl.innerHTML = '';
+  if (totalIncOrNull === null) {
+    wfEl.innerHTML = '<div class="transfer-pick-empty">Dati non disponibili.</div>';
+    return;
+  }
+  const totalInc = totalIncOrNull;
+  const wfData = [{label:'✅ Entrate', val: totalInc, color:'#34d399'}];
+  fixedExp.forEach(item => wfData.push({ label: `${item.icon} ${item.name}`, val: -item.eur, color:'#f87171' }));
+  wfData.push({ label: '🛒 Spese variabili', val: -totalVar, color:'#fb923c' });
+  wfData.push({ label: '⚖️ Saldo Finale', val: saldo, color: saldo>=0 ? '#34d399' : '#f87171' });
+
+  const maxWF = Math.max(totalInc, 1);
+  wfData.forEach(d=>{
+    const w=Math.abs((d.val/maxWF)*100).toFixed(1);
+    const sign=d.val>0?'+':'−';
+    const row=document.createElement('div'); row.className='wf-row';
+    row.innerHTML=`<div class="wf-label">${d.label}</div>
+      <div class="wf-track"><div class="wf-bar" style="width:0%;background:${d.color}" data-w="${w}%">${w>10?sign+fmt(d.val):''}</div></div>
+      <div class="wf-val" style="color:${d.color}">${sign+fmt(d.val)}</div>`;
+    wfEl.appendChild(row);
+  });
+}
+
+function attachTooltips() {
+  const tip=document.getElementById('tooltip');
+  document.querySelectorAll('#dashboard-view .flow-item').forEach(el=>{
+    el.addEventListener('mousemove',e=>{ tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-10)+'px'; });
+    el.addEventListener('mouseleave',()=>tip.style.display='none');
+  });
+}
+
+function renderFlusso() {
+  const incRowEl = document.getElementById('income-rows');
+  const varRowEl = document.getElementById('var-rows');
+  incRowEl.innerHTML = ''; varRowEl.innerHTML = '';
+
+  document.getElementById('card-fix-val').textContent = '−' + fmt(totalFix);
+  document.getElementById('fixed-total').textContent = '−' + fmt(totalFix);
+  renderFixedRows();
+
+  const locked = incomes === null || varExp === null;
+  if (locked) {
+    const msg = flussoAuthorized === false
+      ? '🔒 Accedi con Google in Quick Add per vedere qui le entrate/spese variabili registrate.'
+      : '⏳ Verifica accesso in corso…';
+    incRowEl.innerHTML = `<div class="transfer-pick-empty">${msg}</div>`;
+    varRowEl.innerHTML = `<div class="transfer-pick-empty">${msg}</div>`;
+    ['income-total','var-total'].forEach(id => document.getElementById(id).textContent = '—');
+    ['card-inc-val','card-var-val','card-net-val'].forEach(id => document.getElementById(id).textContent = '—');
+    const subMsg = flussoAuthorized===false ? 'Accedi per vedere' : 'Verifica accesso in corso…';
+    document.getElementById('card-inc-sub').textContent = subMsg;
+    document.getElementById('card-var-sub').textContent = subMsg;
+    document.getElementById('card-net-sub').textContent = subMsg;
+    document.getElementById('deficit-val').textContent = '—';
+    document.getElementById('deficit-note').textContent = msg;
+    document.getElementById('deficit-months-val').textContent = '—';
+    renderWaterfall(null);
+    return;
+  }
+
+  const totalInc = incomes.reduce((s,i)=>s+i.eur,0);
+  const totalVar = varExp.reduce((s,i)=>s+i.eur,0);
+  const totalExp2 = totalFix + totalVar;
+  const saldo = totalInc - totalExp2;
+
+  document.getElementById('income-total').textContent = '+' + fmt(totalInc);
+  document.getElementById('var-total').textContent = '−' + fmt(totalVar);
+
+  document.getElementById('card-inc-val').textContent = '+' + fmt(totalInc);
+  document.getElementById('card-inc-sub').textContent = `${incomes.length} ${incomes.length===1?'entrata':'entrate'} · ${monthLabelFlusso}`;
+  document.getElementById('card-var-val').textContent = '−' + fmt(totalVar);
+  document.getElementById('card-var-sub').textContent = `${monthLabelFlusso} · ${varExp.length} ${varExp.length===1?'voce':'voci'}`;
+  document.getElementById('card-net-val').textContent = (saldo>=0?'+':'−') + fmt(Math.abs(saldo));
+  document.getElementById('card-net-val').className = 'card-val ' + (saldo>=0?'green':'red');
+  document.getElementById('card-net-sub').textContent = saldo>=0 ? 'Surplus mensile' : 'Deficit mensile';
+
+  if (!incomes.length) {
+    incRowEl.innerHTML = `<div class="transfer-pick-empty">Nessuna entrata registrata per ${monthLabelFlusso}.</div>`;
+  } else {
+    const maxInc = Math.max(...incomes.map(i=>i.eur));
+    incomes.forEach(item=>{
+      const pct=((item.eur/totalInc)*100).toFixed(1);
+      const bW=((item.eur/maxInc)*100).toFixed(1);
+      const el=document.createElement('div'); el.className='flow-item';
+      el.innerHTML=`<div class="fi-icon">${item.icon}</div>
+        <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:0%;background:#34d399" data-w="${bW}%"></div></div></div>
+        <div class="fi-right"><div class="fi-val green">+${fmt(item.eur)}</div>
+        <div class="fi-pct">${pct}% entrate</div></div>`;
+      incRowEl.appendChild(el);
+    });
+  }
+
+  if (!varExp.length) {
+    varRowEl.innerHTML = `<div class="transfer-pick-empty">Nessuna spesa variabile registrata per ${monthLabelFlusso}.</div>`;
+  } else {
+    const maxVar = Math.max(...varExp.map(i=>i.eur));
+    varExp.forEach(item=>{
+      const pct=((item.eur/totalVar)*100).toFixed(1);
+      const bW=((item.eur/maxVar)*100).toFixed(1);
+      const el=document.createElement('div'); el.className='flow-item';
+      el.innerHTML=`<div class="fi-icon">${item.icon}</div>
+        <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:0%;background:#fb923c" data-w="${bW}%"></div></div></div>
+        <div class="fi-right"><div class="fi-val orange">−${fmt(item.eur)}</div>
+        <div class="fi-pct">${pct}% var.</div></div>`;
+      varRowEl.appendChild(el);
+    });
+  }
+
+  const liquidCat = categories.find(c => c.label.indexOf('Liquidità') !== -1);
+  const liquidVal = liquidCat ? liquidCat.value : 0;
+  document.getElementById('deficit-val').textContent = (saldo>=0?'+':'−') + fmt(Math.abs(saldo));
+  document.getElementById('deficit-val').style.color = saldo>=0 ? '#34d399' : '#f87171';
+  document.getElementById('deficit-note').textContent = `${monthLabelFlusso} · Spese variabili: ${fmt(totalVar)} · Liquidità: ${fmt(liquidVal)}`;
+  if (saldo < 0 && liquidVal > 0) {
+    document.getElementById('deficit-months-val').textContent = '~' + Math.max(1, Math.round(liquidVal/Math.abs(saldo))) + ' mesi';
+  } else if (saldo >= 0) {
+    document.getElementById('deficit-months-val').textContent = '∞';
+  } else {
+    document.getElementById('deficit-months-val').textContent = '—';
+  }
+
+  renderWaterfall(totalInc, totalVar, saldo);
+
+  setTimeout(()=>{
+    document.querySelectorAll('#dashboard-view .bar-fill, #dashboard-view .wf-bar').forEach(b=>{
+      if(b.dataset.w) b.style.width=b.dataset.w;
+    });
+  },150);
+
+  attachTooltips();
+}
+
+renderFlusso();
 </script>
 
 </div><!-- /dashboard-view -->
