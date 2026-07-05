@@ -184,6 +184,8 @@
   #dashboard-view .fi-right { text-align: right; }
   #dashboard-view .fi-val { font-size: 0.8rem; font-weight: 700; }
   #dashboard-view .fi-pct { font-size: 0.63rem; color: #64748b; margin-top: 1px; }
+  #dashboard-view .flow-del { background:none; border:none; color:#64748b; font-size:0.85rem; cursor:pointer; padding:4px; flex-shrink:0; opacity:0.55; transition:opacity 0.15s, color 0.15s; }
+  #dashboard-view .flow-del:hover { opacity:1; color:#f87171; }
   #dashboard-view .bar-track { height: 4px; background: #2d3148; border-radius: 2px; margin-top: 4px; overflow: hidden; }
   #dashboard-view .bar-fill { height: 100%; border-radius: 2px; }
   #dashboard-view .sep { font-size: 0.62rem; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 4px; margin: 4px 0 2px; }
@@ -1638,6 +1640,7 @@ async function loadFlussoLive() {
     snap.forEach(doc => {
       const d = doc.data();
       const row = {
+        id: doc.id,
         icon: extractIcon(d.category),
         name: d.description || stripIcon(d.category) || 'Transazione',
         sub: `${stripIcon(d.category)} · ${d.account || ''} · ${d.date || ''}`,
@@ -1653,6 +1656,14 @@ async function loadFlussoLive() {
   }
   renderFlusso();
 }
+
+// Elimina una entrata/spesa variabile direttamente dal Flusso Mensile.
+// Riusa la stessa deleteTx() esposta dal modulo Quick Add (stesso Firestore doc,
+// stessa conferma, stesso evento fin-transactions-changed per aggiornare tutto).
+window.deleteFlussoTx = function(id) {
+  if (window.deleteTx) window.deleteTx(id);
+  else alert('Servizio non ancora pronto, riprova tra un istante.');
+};
 
 window.addEventListener('fin-auth-changed', (e) => {
   flussoAuthorized = !!(e.detail && e.detail.authorized);
@@ -1782,7 +1793,8 @@ function renderFlusso() {
         <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
         <div class="bar-track"><div class="bar-fill" style="width:0%;background:#34d399" data-w="${bW}%"></div></div></div>
         <div class="fi-right"><div class="fi-val green">+${fmt(item.eur)}</div>
-        <div class="fi-pct">${pct}% entrate</div></div>`;
+        <div class="fi-pct">${pct}% entrate</div></div>
+        <button class="flow-del" title="Elimina registrazione" onclick="deleteFlussoTx('${item.id}')">🗑️</button>`;
       incRowEl.appendChild(el);
     });
   }
@@ -1799,7 +1811,8 @@ function renderFlusso() {
         <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
         <div class="bar-track"><div class="bar-fill" style="width:0%;background:#fb923c" data-w="${bW}%"></div></div></div>
         <div class="fi-right"><div class="fi-val orange">−${fmt(item.eur)}</div>
-        <div class="fi-pct">${pct}% var.</div></div>`;
+        <div class="fi-pct">${pct}% var.</div></div>
+        <button class="flow-del" title="Elimina registrazione" onclick="deleteFlussoTx('${item.id}')">🗑️</button>`;
       varRowEl.appendChild(el);
     });
   }
