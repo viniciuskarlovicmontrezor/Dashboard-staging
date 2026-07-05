@@ -23,6 +23,10 @@
   .app-tab:hover:not(.active) { border-color: #a78bfa; color: #e2e8f0; }
   .app-view { display: none; }
   .app-view.active { display: block; }
+  .app-version-footer {
+    text-align: center; font-size: 0.62rem; color: #3d4b61;
+    padding: 10px 0 22px; letter-spacing: 0.03em; background: #0a0c12;
+  }
 
   /* ===================================================== */
   /* ============== DASHBOARD FINANZIARIO CSS ============= */
@@ -2061,6 +2065,8 @@ renderFlusso();
 </div><!-- /dashboard-view -->
 </div><!-- /view-dashboard -->
 
+<div class="app-version-footer">Versione 0.8</div>
+
 <script>
 function switchAppView(id, el) {
   document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
@@ -2073,4 +2079,4 @@ function switchAppView(id, el) {
 </body>
 </html>
 
-<!-- redeploy 1783249895999 -->
+<!-- redeploy 1783250569115 -->
