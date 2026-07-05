@@ -2073,8 +2073,7 @@ function renderFlusso() {
   incRowEl.innerHTML = ''; varRowEl.innerHTML = '';
 
   const locked = incomes === null || varExp === null || fixedExp === null;
-
- if (locked) {
+  if (locked) {
     const msg = flussoAuthorized === false
       ? '🔒 Accedi con Google in Quick Add per vedere qui le entrate/spese variabili registrate.'
       : '⏳ Verifica accesso in corso…';
