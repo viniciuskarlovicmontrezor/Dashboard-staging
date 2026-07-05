@@ -186,6 +186,11 @@
   #dashboard-view .fi-pct { font-size: 0.63rem; color: #64748b; margin-top: 1px; }
   #dashboard-view .flow-del { background:none; border:none; color:#64748b; font-size:0.85rem; cursor:pointer; padding:4px; flex-shrink:0; opacity:0.55; transition:opacity 0.15s, color 0.15s; }
   #dashboard-view .flow-del:hover { opacity:1; color:#f87171; }
+  #dashboard-view .fix-paid-toggle { font-size:0.62rem; padding:2px 8px; border-radius:20px; cursor:pointer; white-space:nowrap; display:inline-block; margin-top:4px; }
+  #dashboard-view .fix-paid-toggle.paid { background:rgba(52,211,153,0.15); color:#34d399; }
+  #dashboard-view .fix-paid-toggle.unpaid { background:rgba(100,116,139,0.18); color:#94a3b8; }
+  #dashboard-view .fix-cancelled-tag { font-size:0.62rem; color:#64748b; margin-top:4px; }
+  #dashboard-view .fix-undo-link { color:#a78bfa; cursor:pointer; text-decoration:underline; margin-left:6px; }
   #dashboard-view .bar-track { height: 4px; background: #2d3148; border-radius: 2px; margin-top: 4px; overflow: hidden; }
   #dashboard-view .bar-fill { height: 100%; border-radius: 2px; }
   #dashboard-view .sep { font-size: 0.62rem; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 4px; margin: 4px 0 2px; }
@@ -416,7 +421,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot
+  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, where, orderBy, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ===== FIREBASE CONFIG (progetto: dashboard-finanziario) =====
@@ -437,7 +442,7 @@ const provider = new GoogleAuthProvider();
 
 // Espone le primitive Firestore al Dashboard (script classico, non-module),
 // che ne ha bisogno per leggere le transazioni di Quick Add nel Flusso Mensile.
-window.__fin = { db, collection, query, where, getDocs };
+window.__fin = { db, collection, query, where, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc, serverTimestamp };
 
 // ===== AUTH =====
 const authGate = document.getElementById('auth-gate');
@@ -1604,8 +1609,12 @@ window.copyTransferCode = function() {
 };
 
 /* ===== FLUSSO DATA ===== */
-/* Costi Fissi: restano un elenco mantenuto a mano (abbonamenti/affitti ricorrenti noti) */
-const fixedExp = [
+/* Costi Fissi: vivono su Firestore (collezione fixed_expenses) cosi' da poter essere
+   gestiti dall'app (segnare pagato/non pagato, cancellare). Questo elenco serve solo
+   come seed una tantum: la prima volta che l'app gira, se la collezione e' vuota,
+   viene popolata con questi valori storici. Da quel momento in poi Firestore e' l'unica
+   fonte di verita'. */
+const FIXED_EXPENSES_SEED = [
   {icon:'🏠',name:'Affitto Via Ebro 9, Ap.23',sub:'Milano',eur:1300,cat:'Casa'},
   {icon:'💪',name:'Virgin Active Palestra',sub:'Abbonamento mensile',eur:160,cat:'Salute'},
   {icon:'⚡',name:'A2A Luce',sub:'€180 ogni 2 mesi',eur:90,cat:'Utenze'},
@@ -1615,7 +1624,19 @@ const fixedExp = [
   {icon:'🏝️',name:'Casa Florianópolis',sub:'IPTU + Rampa + CELESC',eur:25.84,cat:'Casa BR'},
   {icon:'❄️',name:'Condizionatore portatile (rata)',sub:'5 rate · giu–ott 2026 · €359,99 totale',eur:72,cat:'Casa'},
 ];
-const totalFix = fixedExp.reduce((s,i)=>s+i.eur,0);
+/* null = non ancora caricato da Firestore (in attesa di autenticazione) */
+let fixedExp = null;
+let totalFix = 0;
+
+function addMonthsToKey(monthKey, n) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function monthKeyLabel(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month:'long', year:'numeric' });
+}
 
 /* Entrate e Spese Variabili arrivano dal vivo dalle transazioni Quick Add del mese corrente.
    null = stato non ancora determinato (in attesa di autenticazione), [] = determinato e vuoto. */
@@ -1665,13 +1686,95 @@ window.deleteFlussoTx = function(id) {
   else alert('Servizio non ancora pronto, riprova tra un istante.');
 };
 
+// Carica (e se necessario semina una tantum) i Costi Fissi da Firestore.
+// Ogni voce e' filtrata: resta visibile se non e' stata cancellata, o se la
+// cancellazione vale solo da un mese futuro (questo mese la spesa e' comunque dovuta).
+async function loadFixedExpenses() {
+  if (!flussoAuthorized || !window.__fin) return;
+  try {
+    const { db, collection, getDocs, addDoc, query, where } = window.__fin;
+    let snap = await getDocs(collection(db, 'fixed_expenses'));
+    if (snap.empty) {
+      for (let i = 0; i < FIXED_EXPENSES_SEED.length; i++) {
+        await addDoc(collection(db, 'fixed_expenses'), { ...FIXED_EXPENSES_SEED[i], order: i, cancelledFromMonth: null });
+      }
+      snap = await getDocs(collection(db, 'fixed_expenses'));
+    }
+    const templates = [];
+    snap.forEach(docSnap => templates.push({ id: docSnap.id, ...docSnap.data() }));
+    templates.sort((a,b) => (a.order||0) - (b.order||0));
+
+    const paySnap = await getDocs(query(collection(db, 'fixed_expense_payments'), where('month', '==', monthKeyFlusso)));
+    const paidIds = new Set();
+    paySnap.forEach(docSnap => paidIds.add(docSnap.data().templateId));
+
+    fixedExp = templates
+      .filter(t => !t.cancelledFromMonth || t.cancelledFromMonth > monthKeyFlusso)
+      .map(t => ({ ...t, paid: paidIds.has(t.id) }));
+    totalFix = fixedExp.reduce((s,i)=>s+i.eur,0);
+  } catch (e) {
+    console.error('Errore lettura Costi Fissi da Firestore:', e);
+    fixedExp = []; totalFix = 0;
+  }
+  renderFlusso();
+}
+
+// Segna/toglie il pagamento di un Costo Fisso per il mese corrente.
+window.toggleFixedPaid = async function(id) {
+  if (!window.__fin) return;
+  const item = (fixedExp||[]).find(i => i.id === id);
+  if (!item) return;
+  const { db, doc, setDoc, deleteDoc } = window.__fin;
+  const payId = `${id}_${monthKeyFlusso}`;
+  try {
+    if (item.paid) {
+      await deleteDoc(doc(db, 'fixed_expense_payments', payId));
+    } else {
+      await setDoc(doc(db, 'fixed_expense_payments', payId), { templateId: id, month: monthKeyFlusso, paid: true });
+    }
+    await loadFixedExpenses();
+  } catch (e) {
+    console.error('Errore aggiornamento stato pagamento:', e);
+    alert('Errore: ' + e.message);
+  }
+};
+
+// Cancella un Costo Fisso a partire dal mese successivo (resta valido per il mese
+// corrente, dato che la spesa e' comunque gia' dovuta ora).
+window.cancelFixedExpense = async function(id) {
+  const item = (fixedExp||[]).find(i => i.id === id);
+  if (!item) return;
+  const fromMonth = addMonthsToKey(monthKeyFlusso, 1);
+  if (!confirm(`Cancellare "${item.name}"? Restera' tra i costi fissi di ${monthLabelFlusso}, ma da ${monthKeyLabel(fromMonth)} in poi non apparira' piu'.`)) return;
+  try {
+    const { db, doc, updateDoc } = window.__fin;
+    await updateDoc(doc(db, 'fixed_expenses', id), { cancelledFromMonth: fromMonth });
+    await loadFixedExpenses();
+  } catch (e) {
+    console.error('Errore cancellazione costo fisso:', e);
+    alert('Errore: ' + e.message);
+  }
+};
+
+window.undoCancelFixedExpense = async function(id) {
+  try {
+    const { db, doc, updateDoc } = window.__fin;
+    await updateDoc(doc(db, 'fixed_expenses', id), { cancelledFromMonth: null });
+    await loadFixedExpenses();
+  } catch (e) {
+    console.error('Errore ripristino costo fisso:', e);
+    alert('Errore: ' + e.message);
+  }
+};
+
 window.addEventListener('fin-auth-changed', (e) => {
   flussoAuthorized = !!(e.detail && e.detail.authorized);
   if (flussoAuthorized) {
     loadFlussoLive();
+    loadFixedExpenses();
     refreshPatrimonioLiquidity();
   } else {
-    incomes = null; varExp = null;
+    incomes = null; varExp = null; fixedExp = null;
     renderFlusso();
   }
 });
@@ -1689,16 +1792,32 @@ window.addEventListener('fin-transactions-changed', () => {
 function renderFixedRows() {
   const expRowEl = document.getElementById('expense-rows');
   expRowEl.innerHTML = '';
+  if (fixedExp === null) {
+    const msg = flussoAuthorized === false
+      ? '🔒 Accedi con Google in Quick Add per gestire i costi fissi.'
+      : '⏳ Verifica accesso in corso…';
+    expRowEl.innerHTML = `<div class="transfer-pick-empty">${msg}</div>`;
+    return;
+  }
+  if (!fixedExp.length) {
+    expRowEl.innerHTML = '<div class="transfer-pick-empty">Nessun costo fisso.</div>';
+    return;
+  }
   const maxFixed = Math.max(...fixedExp.map(i=>i.eur));
   fixedExp.forEach(item=>{
     const pct=((item.eur/totalFix)*100).toFixed(1);
     const bW=((item.eur/maxFixed)*100).toFixed(1);
     const el=document.createElement('div'); el.className='flow-item';
+    const statusHtml = item.cancelledFromMonth
+      ? `<div class="fix-cancelled-tag">🚫 Cancellato da ${monthKeyLabel(item.cancelledFromMonth)} <span class="fix-undo-link" onclick="undoCancelFixedExpense('${item.id}')">Annulla</span></div>`
+      : `<span class="fix-paid-toggle ${item.paid?'paid':'unpaid'}" onclick="toggleFixedPaid('${item.id}')">${item.paid?'✅ Pagato':'⭕ Da pagare'}</span>`;
     el.innerHTML=`<div class="fi-icon">${item.icon}</div>
       <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
-      <div class="bar-track"><div class="bar-fill" style="width:0%;background:#f87171" data-w="${bW}%"></div></div></div>
+      <div class="bar-track"><div class="bar-fill" style="width:0%;background:#f87171" data-w="${bW}%"></div></div>
+      ${statusHtml}</div>
       <div class="fi-right"><div class="fi-val red">−${fmt(item.eur)}</div>
-      <div class="fi-pct">${pct}% fissi</div></div>`;
+      <div class="fi-pct">${pct}% fissi</div></div>
+      ${item.cancelledFromMonth ? '' : `<button class="flow-del" title="Cancella dal mese prossimo" onclick="cancelFixedExpense('${item.id}')">🗑️</button>`}`;
     expRowEl.appendChild(el);
   });
 }
@@ -1741,19 +1860,15 @@ function renderFlusso() {
   const varRowEl = document.getElementById('var-rows');
   incRowEl.innerHTML = ''; varRowEl.innerHTML = '';
 
-  document.getElementById('card-fix-val').textContent = '−' + fmt(totalFix);
-  document.getElementById('fixed-total').textContent = '−' + fmt(totalFix);
-  renderFixedRows();
-
-  const locked = incomes === null || varExp === null;
+  const locked = incomes === null || varExp === null || fixedExp === null;
   if (locked) {
     const msg = flussoAuthorized === false
       ? '🔒 Accedi con Google in Quick Add per vedere qui le entrate/spese variabili registrate.'
       : '⏳ Verifica accesso in corso…';
     incRowEl.innerHTML = `<div class="transfer-pick-empty">${msg}</div>`;
     varRowEl.innerHTML = `<div class="transfer-pick-empty">${msg}</div>`;
-    ['income-total','var-total'].forEach(id => document.getElementById(id).textContent = '—');
-    ['card-inc-val','card-var-val','card-net-val'].forEach(id => document.getElementById(id).textContent = '—');
+    ['income-total','var-total','fixed-total'].forEach(id => document.getElementById(id).textContent = '—');
+    ['card-inc-val','card-var-val','card-net-val','card-fix-val'].forEach(id => document.getElementById(id).textContent = '—');
     const subMsg = flussoAuthorized===false ? 'Accedi per vedere' : 'Verifica accesso in corso…';
     document.getElementById('card-inc-sub').textContent = subMsg;
     document.getElementById('card-var-sub').textContent = subMsg;
@@ -1761,9 +1876,14 @@ function renderFlusso() {
     document.getElementById('deficit-val').textContent = '—';
     document.getElementById('deficit-note').textContent = msg;
     document.getElementById('deficit-months-val').textContent = '—';
+    renderFixedRows();
     renderWaterfall(null);
     return;
   }
+
+  document.getElementById('card-fix-val').textContent = '−' + fmt(totalFix);
+  document.getElementById('fixed-total').textContent = '−' + fmt(totalFix);
+  renderFixedRows();
 
   const totalInc = incomes.reduce((s,i)=>s+i.eur,0);
   const totalVar = varExp.reduce((s,i)=>s+i.eur,0);
