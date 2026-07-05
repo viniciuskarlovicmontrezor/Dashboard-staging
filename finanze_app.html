@@ -183,6 +183,14 @@
   #dashboard-view .month-nav-btn:active { transform:scale(0.93); }
   #dashboard-view .month-nav-current { font-size:0.95rem; font-weight:700; color:#e2e8f0; min-width:170px; text-align:center; text-transform:capitalize; }
   #dashboard-view .month-nav-today-hint { display:block; font-size:0.62rem; font-weight:500; color:#64748b; text-transform:none; margin-top:2px; }
+
+  /* Ricalcolo snapshot congelato (mese gia' chiuso, dopo una correzione) */
+  #dashboard-view .snapshot-recalc-row { display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(251,146,60,0.07); border:1px solid rgba(251,146,60,0.35); border-radius:11px; padding:10px 14px; margin-bottom:14px; flex-wrap:wrap; }
+  #dashboard-view .snapshot-recalc-hint { font-size:0.68rem; color:#fb923c; flex:1; min-width:180px; }
+  #dashboard-view .snapshot-recalc-btn { background:#1a1d2e; border:1px solid #fb923c66; color:#fb923c; font-size:0.72rem; font-weight:700; padding:8px 12px; border-radius:9px; cursor:pointer; white-space:nowrap; transition:all 0.15s; }
+  #dashboard-view .snapshot-recalc-btn:hover { border-color:#fb923c; background:rgba(251,146,60,0.12); }
+  #dashboard-view .snapshot-recalc-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
   #dashboard-view .cards {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;
   }
@@ -268,6 +276,15 @@
   #quickadd-view .currency-toggle { width:100%; max-width:420px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:14px; }
   #quickadd-view .cur-btn { padding:10px 6px; border-radius:12px; border:2px solid var(--border); background:var(--surface); color:var(--muted); font-size:0.85rem; font-weight:700; cursor:pointer; transition:all 0.15s; text-align:center; }
   #quickadd-view .cur-btn.active { border-color:var(--orange); background:rgba(245,158,11,0.12); color:var(--orange); }
+
+  /* Selettore mese di registrazione (correzione lanci in mesi passati) */
+  #quickadd-view .month-select-row { width:100%; max-width:420px; display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
+  #quickadd-view .month-select-btn { background:var(--surface); border:1px solid var(--border); color:var(--purple-light); font-size:0.95rem; font-weight:700; width:32px; height:32px; border-radius:9px; cursor:pointer; flex-shrink:0; }
+  #quickadd-view .month-select-btn:hover { border-color:var(--purple-light); }
+  #quickadd-view .month-select-btn:active { transform:scale(0.92); }
+  #quickadd-view .month-select-label { font-size:0.82rem; font-weight:600; color:var(--text); min-width:140px; text-align:center; text-transform:capitalize; }
+  #quickadd-view .month-select-label .month-select-tag { display:block; font-size:0.62rem; font-weight:500; color:var(--muted); text-transform:none; margin-top:1px; }
+  #quickadd-view .month-select-label .month-select-tag.past { color:var(--orange); }
   #quickadd-view .amount-display { width:100%; max-width:420px; background:var(--surface); border-radius:var(--radius); border:2px solid var(--border); padding:16px 24px; margin-bottom:12px; text-align:center; }
   #quickadd-view .amount-label { font-size:0.67rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:5px; }
   #quickadd-view .amount-value { font-size:2.6rem; font-weight:800; letter-spacing:-1px; min-height:50px; display:flex; align-items:center; justify-content:center; gap:4px; }
@@ -404,6 +421,15 @@
   <button class="cur-btn active" id="cur-eur" onclick="setCurrency('EUR','€')">🇪🇺 EUR €</button>
   <button class="cur-btn" id="cur-brl" onclick="setCurrency('BRL','R$')">🇧🇷 BRL R$</button>
   <button class="cur-btn" id="cur-usd" onclick="setCurrency('USD','$')">🇺🇸 USD $</button>
+</div>
+
+<!-- Mese di registrazione: di default il mese reale odierno, ma modificabile per
+     poter correggere/aggiungere lanci in mesi passati (es. rifare un lancio di
+     gennaio cancellato per errore, mentre oggi siamo a maggio). -->
+<div class="month-select-row" id="month-select-row">
+  <button type="button" class="month-select-btn" onclick="changeQuickAddMonth(-1)" title="Mese precedente">‹</button>
+  <div class="month-select-label" id="month-select-label">…</div>
+  <button type="button" class="month-select-btn" onclick="changeQuickAddMonth(1)" title="Mese successivo">›</button>
 </div>
 
 <div class="amount-display">
@@ -632,6 +658,30 @@ const yyyy = now.getFullYear();
 const monthKey = `${yyyy}-${mm}`;
 const todayStr = `${dd}/${mm}`;
 document.getElementById('today-date').textContent = `${dd}/${mm}/${yyyy}`;
+
+// Mese di registrazione selezionato dall'utente: di default il mese reale odierno
+// (monthKey), ma modificabile per poter correggere/aggiungere lanci in mesi
+// passati (es. rifare un lancio di gennaio cancellato per errore, mentre oggi
+// siamo a maggio). Non si puo' andare oltre il mese odierno (niente lanci nel
+// futuro) ne' oltre 60 mesi indietro (limite di buonsenso).
+let selectedMonthKey = monthKey;
+const MONTH_SELECT_MAX_BACK = 60;
+function updateMonthSelectUI() {
+  const label = document.getElementById('month-select-label');
+  if (!label) return;
+  const isToday = selectedMonthKey === monthKey;
+  const tagText = isToday ? 'mese corrente' : '⚠️ mese passato — correzione';
+  const tagClass = isToday ? 'month-select-tag' : 'month-select-tag past';
+  label.innerHTML = `${monthKeyLabelQA(selectedMonthKey)}<span class="${tagClass}">${tagText}</span>`;
+}
+window.changeQuickAddMonth = function(delta) {
+  const candidate = addMonthsToKeyQA(selectedMonthKey, delta);
+  if (candidate > monthKey) return; // niente lanci nel futuro
+  if (candidate < addMonthsToKeyQA(monthKey, -MONTH_SELECT_MAX_BACK)) return; // limite di buonsenso
+  selectedMonthKey = candidate;
+  updateMonthSelectUI();
+};
+updateMonthSelectUI();
 
 const expCats = ['🏠 Casa','🛒 Spesa','🍽️ Ristoranti','🚌 Trasporti','💊 Salute','🎉 Svago','💻 Software','⚡ Utenze','🧴 Igiene','👗 Abbigliamento','❄️ Elettrodomestici','📦 Altro'];
 const incCats = ['🏠 Affitti SP','💰 Dividendi','💼 Lavoro','🔄 Rimborso','📈 Investimenti','📦 Altro'];
@@ -917,10 +967,10 @@ window.submitTx = async function submitTx() {
         icon,
         cat: catText,
         eur: perRataEur,
-        cancelledFromMonth: addMonthsToKeyQA(monthKey, numRate),
+        cancelledFromMonth: addMonthsToKeyQA(selectedMonthKey, numRate),
         installments: numRate,
         totalAmount: totalEur,
-        startMonth: monthKey,
+        startMonth: selectedMonthKey,
         order: Date.now(),
         createdAt: serverTimestamp()
       });
@@ -953,6 +1003,14 @@ window.submitTx = async function submitTx() {
       const cat = selCat || '📦 Altro';
       const amountEur = toEur(amt, currency);
 
+      // Se il mese selezionato e' quello odierno usiamo la data reale di oggi;
+      // se e' un mese passato (correzione) non conosciamo il giorno esatto, quindi
+      // usiamo il 1° del mese selezionato come data indicativa (solo cosmetica,
+      // il campo che conta per i calcoli e' 'month').
+      const isCurrentMonth = selectedMonthKey === monthKey;
+      const [selYyyy, selMm] = selectedMonthKey.split('-');
+      const txDate = isCurrentMonth ? `${dd}/${mm}/${yyyy}` : `01/${selMm}/${selYyyy}`;
+
       await addDoc(collection(db, 'transactions'), {
         type,                       // 'expense' | 'income'
         amount: amt,
@@ -961,8 +1019,8 @@ window.submitTx = async function submitTx() {
         description: desc,
         category: cat,
         account: acc.name,
-        date: `${dd}/${mm}/${yyyy}`,
-        month: monthKey,
+        date: txDate,
+        month: selectedMonthKey,
         createdAt: serverTimestamp()
       });
 
@@ -1187,6 +1245,14 @@ document.getElementById('installment-row').style.display = type === 'expense' ? 
     <button class="month-nav-btn" onclick="navigateFlussoMonth(-1)" title="Mese precedente">◀</button>
     <div class="month-nav-current" id="month-nav-current">…</div>
     <button class="month-nav-btn" onclick="navigateFlussoMonth(1)" title="Mese successivo">▶</button>
+  </div>
+
+  <!-- Questo mese ha gia' uno snapshot storico congelato (vedi chiusura mese
+       automatica): se hai corretto un lancio passato dopo la chiusura, i dati
+       congelati non si aggiornano da soli, serve ricalcolarli esplicitamente. -->
+  <div class="snapshot-recalc-row" id="snapshot-recalc-row" style="display:none;">
+    <span class="snapshot-recalc-hint" id="snapshot-recalc-hint"></span>
+    <button class="snapshot-recalc-btn" onclick="recalculateMonthSnapshot()" id="snapshot-recalc-btn">🔄 Ricalcola snapshot di questo mese</button>
   </div>
 
   <div class="cards">
@@ -2181,6 +2247,73 @@ function updateMonthNavUI() {
     : monthLabelFlusso;
 }
 
+// Se il mese attualmente mostrato ha gia' uno snapshot storico congelato (vedi
+// chiusura mese automatica), mostra il bottone "Ricalcola" con la data di
+// chiusura: se dopo quella data hai corretto/aggiunto un lancio in quel mese
+// (dal selettore mese del Quick Add), lo snapshot congelato NON si aggiorna da
+// solo e serve ricalcolarlo esplicitamente da qui.
+async function checkSnapshotForCurrentMonth() {
+  const row = document.getElementById('snapshot-recalc-row');
+  if (!row) return;
+  if (!flussoAuthorized || !window.__fin || !window.__fin.getDoc) { row.style.display = 'none'; return; }
+  try {
+    const { db, doc, getDoc } = window.__fin;
+    const snap = await getDoc(doc(db, 'monthly_snapshots', monthKeyFlusso));
+    if (!snap.exists()) { row.style.display = 'none'; return; }
+    const data = snap.data();
+    let whenText = '';
+    if (data.closedAt && typeof data.closedAt.toDate === 'function') {
+      whenText = ' il ' + data.closedAt.toDate().toLocaleDateString('it-IT');
+    }
+    document.getElementById('snapshot-recalc-hint').textContent =
+      `📌 Mese chiuso${whenText}. Se hai corretto un lancio dopo, ricalcola per aggiornare lo storico.`;
+    row.style.display = 'flex';
+  } catch (e) {
+    console.error('Errore verifica snapshot mese:', e);
+    row.style.display = 'none';
+  }
+}
+
+// Forza il ricalcolo dello snapshot storico del mese attualmente mostrato,
+// sovrascrivendo quello congelato con i dati correnti (dopo una correzione).
+// A differenza di closeElapsedMonthIfNeeded, qui la sovrascrittura e' voluta:
+// e' un'azione esplicita dell'utente, non automatica.
+const SNAPSHOT_RECALC_DEFAULT_LABEL = '🔄 Ricalcola snapshot di questo mese';
+window.recalculateMonthSnapshot = async function() {
+  if (!flussoAuthorized || !window.__fin || !window.__fin.getDoc) return;
+  const btn = document.getElementById('snapshot-recalc-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Ricalcolo in corso…'; }
+  try {
+    const { db, doc, setDoc, serverTimestamp } = window.__fin;
+    const target = monthKeyFlusso;
+    const [{ totalIncome, totalVariable, totalFixed }, saldoIniz] = await Promise.all([
+      computeMonthTotals(target),
+      computeSaldoIniziale(target)
+    ]);
+    if (saldoIniz === null) throw new Error('impossibile calcolare il saldo iniziale');
+    const saldoFinale = saldoIniz + totalIncome - totalFixed - totalVariable;
+
+    await setDoc(doc(db, 'monthly_snapshots', target), {
+      month: target,
+      closedAt: serverTimestamp(),
+      flusso: { totalIncome, totalVariable, totalFixed, saldoIniziale: saldoIniz, saldoFinale },
+      patrimonio: { total: totalPat, categories: categories.map(c => ({ label: c.label, value: c.value })) }
+    });
+    await checkSnapshotForCurrentMonth();
+    // Conferma inline nel bottone stesso (il toast del Quick Add vive in un altro
+    // .app-view e resterebbe nascosto se qui siamo sulla Dashboard).
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '✅ Aggiornato adesso';
+      setTimeout(() => { if (btn.textContent === '✅ Aggiornato adesso') btn.textContent = SNAPSHOT_RECALC_DEFAULT_LABEL; }, 2500);
+    }
+  } catch (e) {
+    console.error('Errore ricalcolo snapshot mese:', e);
+    if (btn) { btn.disabled = false; btn.textContent = SNAPSHOT_RECALC_DEFAULT_LABEL; }
+    alert('Errore durante il ricalcolo: ' + e.message);
+  }
+};
+
 // Naviga di un mese avanti (delta=1) o indietro (delta=-1). Un mese alla volta,
 // mai vista aggregata multi-mese (requisito task #18). Ricarica entrate/spese/costi
 // fissi per il nuovo mese e ricalcola il saldo di partenza riportato.
@@ -2191,6 +2324,7 @@ window.navigateFlussoMonth = async function(delta) {
   incomes = null; varExp = null; fixedExp = null; saldoIniziale = null;
   renderFlusso();
   if (!flussoAuthorized) return;
+  checkSnapshotForCurrentMonth();
   const [, , iniziale] = await Promise.all([
     loadFlussoLive(),
     loadFixedExpenses(),
@@ -2256,9 +2390,12 @@ window.addEventListener('fin-auth-changed', (e) => {
     refreshPatrimonioLiquidity();
     computeSaldoIniziale(monthKeyFlusso).then(v => { saldoIniziale = v; renderFlusso(); });
     closeElapsedMonthIfNeeded();
+    checkSnapshotForCurrentMonth();
   } else {
     incomes = null; varExp = null; fixedExp = null; saldoIniziale = null;
     renderFlusso();
+    const row = document.getElementById('snapshot-recalc-row');
+    if (row) row.style.display = 'none';
   }
 });
 
