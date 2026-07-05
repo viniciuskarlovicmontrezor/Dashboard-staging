@@ -249,6 +249,9 @@
   #quickadd-view .amount-value.expense { color:var(--red); } #quickadd-view .amount-value.income { color:var(--green); }
   #quickadd-view .amount-cursor { width:3px; height:2.2rem; background:var(--purple-light); animation:blink 1s infinite; border-radius:2px; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  #quickadd-view .amount-pct { width:100%; max-width:420px; text-align:center; font-size:0.72rem; color:var(--muted); margin:-4px 0 12px; min-height:14px; transition:color 0.15s; }
+  #quickadd-view .amount-pct.warn { color:var(--orange); font-weight:600; }
+  #quickadd-view .amount-pct.danger { color:var(--red); font-weight:700; }
   #quickadd-view .numpad { width:100%; max-width:420px; display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-bottom:12px; }
   #quickadd-view .num-btn { background:var(--surface); border:1px solid var(--border); border-radius:13px; color:var(--text); font-size:1.25rem; font-weight:500; padding:16px; cursor:pointer; transition:all 0.1s; text-align:center; user-select:none; }
   #quickadd-view .num-btn:active { transform:scale(0.91); background:var(--surface2); }
@@ -370,6 +373,8 @@
     <span class="amount-cursor"></span>
   </div>
 </div>
+
+<div class="amount-pct" id="liquidity-pct"></div>
 
 <div class="numpad">
   <button class="num-btn" onclick="numPress('1')">1</button>
@@ -568,6 +573,11 @@ const accs = [
   { id:'xp_int',    icon:'🇺🇸', name:'XP Int.',  bal:'$ 132,50',    curs:['USD'] },
 ];
 
+// Sottoinsieme di conti considerati "Liquidità" (stessa definizione usata dalla
+// categoria Liquidità di Patrimonio Netto / LIQUID_ACCOUNT_MAP): esclude Avenue,
+// XP Int. (investimenti) e Revolut (BTC, non tracciabile in valuta).
+const LIQUID_ACC_IDS = ['isybank','wise_eur','wise_brl','bbva','xp_cc','xp_inv','itau','cofrinhos'];
+
 // Saldo dinamico: il valore scritto sopra e' il punto di partenza; da qui in poi
 // il saldo mostrato = punto di partenza + entrate/uscite registrate in Quick Add.
 // Il Revolut (saldo in BTC) resta fisso, non e' tracciabile in valuta.
@@ -591,17 +601,42 @@ async function refreshAccountBalances() {
       deltaEur[d.account] = (deltaEur[d.account] || 0) + sign * (Number(d.amountEur) || 0);
     });
     const symMap = { EUR:'€ ', BRL:'R$ ', USD:'$ ' };
+    let liquidityTotalEur = 0;
     accs.forEach(a => {
       if (!a.dynamic) return;
       const newEur = a.baseEur + (deltaEur[a.name] || 0);
       const cur = a.curs[0];
       const newInCur = cur === 'EUR' ? newEur : newEur * RATES[cur];
       a.bal = symMap[cur] + newInCur.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+      if (LIQUID_ACC_IDS.includes(a.id)) liquidityTotalEur += newEur;
     });
+    window.__liquidityTotalEur = liquidityTotalEur;
     renderAccounts();
+    updatePctDisplay();
   } catch (e) {
     console.error('Errore aggiornamento saldi conti:', e);
   }
+}
+
+// Mostra a colpo d'occhio quale percentuale della liquidità totale (in EUR)
+// rappresenta l'importo che si sta per registrare in Quick Add. Se la valuta
+// selezionata non e' EUR, converte con il tasso del giorno (toEur/RATES).
+function updatePctDisplay() {
+  const el = document.getElementById('liquidity-pct');
+  if (!el) return;
+  const amt = parseFloat(amountRaw);
+  const liquidity = window.__liquidityTotalEur;
+  if (!amt || amt <= 0 || !liquidity || liquidity <= 0) {
+    el.textContent = '';
+    el.className = 'amount-pct';
+    return;
+  }
+  const amtEur = toEur(amt, currency);
+  const pct = (amtEur / liquidity) * 100;
+  const pctStr = pct < 10 ? pct.toFixed(1) : pct.toFixed(0);
+  const liqStr = liquidity.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+  el.textContent = `≈ ${pctStr}% della tua liquidità (€ ${liqStr})`;
+  el.className = 'amount-pct' + (pct >= 100 ? ' danger' : pct >= 50 ? ' warn' : '');
 }
 
 function renderCats() {
@@ -650,6 +685,7 @@ window.setCurrency = function(cur,sym) {
   ['eur','brl','usd'].forEach(c=>document.getElementById('cur-'+c).classList.remove('active'));
   document.getElementById('cur-'+cur.toLowerCase()).classList.add('active');
   selAcc=''; renderAccounts();
+  updatePctDisplay();
 };
 
 window.numPress = function(v) {
@@ -659,12 +695,14 @@ window.numPress = function(v) {
   amountRaw+=v;
   document.getElementById('amount-text').textContent=amountRaw||'0';
   updateSubmitState();
+  updatePctDisplay();
 };
 
 window.numDel = function() {
   amountRaw=amountRaw.slice(0,-1);
   document.getElementById('amount-text').textContent=amountRaw||'0';
   updateSubmitState();
+  updatePctDisplay();
 };
 
 function updateSubmitState() {
@@ -716,6 +754,7 @@ window.submitTx = async function submitTx() {
     document.getElementById('amount-text').textContent='0';
     document.getElementById('desc').value='';
     selCat=''; renderCats();
+    updatePctDisplay();
   } catch (e) {
     console.error(e);
     statusEl.className='ai-status error';
@@ -1979,4 +2018,4 @@ function switchAppView(id, el) {
 </body>
 </html>
 
-<!-- redeploy 1783246130835 -->
+<!-- redeploy 1783248064036 -->
