@@ -618,6 +618,50 @@ async function refreshAccountBalances() {
   }
 }
 
+// ===== CAMBIO EUR/BRL/USD: aggiornamento automatico 1 volta al giorno =====
+// Fonte pubblica (Frankfurter / dati BCE). Il valore in RATES sopra resta come
+// fallback se offline o se la chiamata fallisce. La cache e' per data (YYYY-MM-DD)
+// in localStorage, cosi' si fa al massimo una chiamata di rete al giorno.
+// Ogni volta che il tasso cambia si ricalcolano automaticamente i saldi conto e
+// la percentuale di liquidita' in Quick Add (refreshAccountBalances/updatePctDisplay),
+// e si avvisa il resto della pagina (Patrimonio Netto / calcolatore trasferimento)
+// con l'evento 'fin-fx-updated'.
+const FX_CACHE_KEY = 'fx_rates_cache_v1';
+
+function applyFxRates(brl, usd, dateStr) {
+  RATES.BRL = brl;
+  RATES.USD = usd;
+  window.__fxRates = { EUR: 1, BRL: brl, USD: usd, date: dateStr };
+  window.dispatchEvent(new CustomEvent('fin-fx-updated', { detail: { BRL: brl, USD: usd, date: dateStr } }));
+  refreshAccountBalances();
+}
+
+async function loadFxRates() {
+  const today = new Date().toISOString().slice(0, 10);
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(FX_CACHE_KEY) || 'null'); } catch (e) { cached = null; }
+  if (cached && cached.date === today && cached.BRL && cached.USD) {
+    applyFxRates(cached.BRL, cached.USD, cached.date);
+    return;
+  }
+  try {
+    const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=BRL,USD');
+    const data = await res.json();
+    const brl = data && data.rates && data.rates.BRL;
+    const usd = data && data.rates && data.rates.USD;
+    if (brl && usd) {
+      try { localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ date: today, BRL: brl, USD: usd })); } catch (e) { /* storage non disponibile, ignora */ }
+      applyFxRates(brl, usd, today);
+    } else if (cached) {
+      applyFxRates(cached.BRL, cached.USD, cached.date);
+    }
+  } catch (e) {
+    console.error('Errore aggiornamento cambio EUR/BRL/USD, uso ultimo valore disponibile:', e);
+    if (cached) applyFxRates(cached.BRL, cached.USD, cached.date);
+  }
+}
+loadFxRates();
+
 // Mostra a colpo d'occhio quale percentuale della liquidità totale (in EUR)
 // rappresenta l'importo che si sta per registrare in Quick Add. Se la valuta
 // selezionata non e' EUR, converte con il tasso del giorno (toEur/RATES).
@@ -1342,7 +1386,7 @@ function refreshPatrimonioLiquidity() {
 }
 
 /* ===== CALCOLATORE TRASFERIMENTO TRA BENI/CONTI ===== */
-const RATE_BRL = 5.92, RATE_USD = 1.1371;
+let RATE_BRL = 5.92, RATE_USD = 1.1371;
 const round2 = n => Math.round(n*100)/100;
 let trSourceIdx = null, trDestSel = null, pendingChange = null;
 
@@ -1828,6 +1872,14 @@ window.addEventListener('fin-transactions-changed', () => {
   }
 });
 
+// Il cambio EUR/BRL/USD e' stato aggiornato (vedi Quick Add): il calcolatore di
+// trasferimento tra beni/conti deve usare da qui in poi il tasso aggiornato.
+window.addEventListener('fin-fx-updated', (e) => {
+  if (!e.detail) return;
+  RATE_BRL = e.detail.BRL;
+  RATE_USD = e.detail.USD;
+});
+
 function renderFixedRows() {
   const expRowEl = document.getElementById('expense-rows');
   expRowEl.innerHTML = '';
@@ -2018,4 +2070,4 @@ function switchAppView(id, el) {
 </body>
 </html>
 
-<!-- redeploy 1783248327850 -->
+<!-- redeploy 1783249203095 -->
