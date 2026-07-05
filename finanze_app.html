@@ -116,6 +116,18 @@
   #dashboard-view .total-note { font-size: 0.68rem; color: #475569; margin-top: 4px; }
   #dashboard-view .hint { text-align: center; font-size: 0.7rem; color: #3d4b61; margin-bottom: 10px; }
 
+  /* ===== BREAKDOWN PER VALUTA (di quanto e' il totale, quanto in EUR/BRL/USD) ===== */
+  #dashboard-view .currency-breakdown-wrap { margin: 16px 0 20px; }
+  #dashboard-view .cb-title { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; text-align: center; }
+  #dashboard-view .currency-breakdown { display: flex; flex-direction: column; gap: 8px; }
+  #dashboard-view .cb-row { display: flex; align-items: center; gap: 12px; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 11px; padding: 10px 14px; }
+  #dashboard-view .cb-icon { font-size: 1.1rem; width: 26px; text-align: center; flex-shrink: 0; }
+  #dashboard-view .cb-text { flex: 1; min-width: 0; }
+  #dashboard-view .cb-label { font-size: 0.72rem; color: #94a3b8; }
+  #dashboard-view .cb-native { font-size: 0.9rem; font-weight: 700; color: #f1f5f9; margin-top: 1px; }
+  #dashboard-view .cb-eur { font-size: 0.68rem; color: #64748b; font-weight: 500; }
+  #dashboard-view .cb-pct { font-size: 0.85rem; font-weight: 800; color: #a78bfa; text-align: right; flex-shrink: 0; }
+
   /* ===== TRASFERIMENTO TRA VOCI (calcolatore) ===== */
   #dashboard-view .transfer-wrap { margin-top: 14px; }
   #dashboard-view .transfer-toggle { width: 100%; background: #1a1d2e; border: 1px solid #2d3148; color: #a78bfa; font-size: 0.8rem; font-weight: 700; padding: 12px 16px; border-radius: 12px; cursor: pointer; text-align: left; }
@@ -172,7 +184,7 @@
   #dashboard-view .month-nav-current { font-size:0.95rem; font-weight:700; color:#e2e8f0; min-width:170px; text-align:center; text-transform:capitalize; }
   #dashboard-view .month-nav-today-hint { display:block; font-size:0.62rem; font-weight:500; color:#64748b; text-transform:none; margin-top:2px; }
   #dashboard-view .cards {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;
   }
   #dashboard-view .card { background: #1a1d2e; border-radius: 11px; padding: 12px 14px; border: 1px solid #2d3148; text-align: center; }
   #dashboard-view .card-label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
@@ -1114,6 +1126,13 @@ document.getElementById('installment-row').style.display = type === 'expense' ? 
     <div class="total-note">Immobili · Precatório · Investimenti · Liquidità</div>
   </div>
 
+  <!-- Di quanto e' il totale, quanto e' denominato in EUR/BRL/USD (esposizione
+       valutaria), calcolato dinamicamente da 'categories' in renderCurrencyBreakdown(). -->
+  <div class="currency-breakdown-wrap">
+    <div class="cb-title">💱 Esposizione per valuta</div>
+    <div class="currency-breakdown" id="currency-breakdown"></div>
+  </div>
+
   <!-- ===== CALCOLATORE TRASFERIMENTO TRA CATEGORIE ===== -->
   <div class="transfer-wrap">
     <button class="transfer-toggle" onclick="toggleTransfer()">🔁 Trasferisci valore tra categorie (calcolatore)</button>
@@ -1185,11 +1204,6 @@ document.getElementById('installment-row').style.display = type === 'expense' ? 
       <div class="card-label">🛒 Spese Variabili</div>
       <div class="card-val orange" id="card-var-val">…</div>
       <div class="card-sub" id="card-var-sub">Verifica accesso in corso…</div>
-    </div>
-    <div class="card">
-      <div class="card-label">⚖️ Saldo Netto</div>
-      <div class="card-val red" id="card-net-val">…</div>
-      <div class="card-sub" id="card-net-sub">Verifica accesso in corso…</div>
     </div>
   </div>
 
@@ -1538,8 +1552,49 @@ function closeDetail(){
 function renderTotal() {
   document.getElementById('center-val').textContent = fmt(totalPat);
   document.querySelector('#dashboard-view .total-value').textContent = fmt(totalPat);
+  renderCurrencyBreakdown();
 }
 renderTotal();
+
+/* Di quanto e' il totale, quanto e' denominato in EUR / BRL / USD. La valuta
+   "nativa" di ogni item e' desunta dai campi presenti: se ha 'brl' e' un bene/conto
+   in Reais, se ha 'usd' e' in Dollari, altrimenti (solo 'eur') e' gia' in Euro.
+   Il campo 'eur' e' sempre presente ed e' il controvalore usato per sommare al
+   totale patrimonio, indipendentemente dalla valuta nativa. */
+function computeCurrencyBreakdown() {
+  const b = { EUR: { native: 0, eur: 0 }, BRL: { native: 0, eur: 0 }, USD: { native: 0, eur: 0 } };
+  categories.forEach(cat => {
+    cat.items.forEach(it => {
+      if (it.brl !== undefined) { b.BRL.native += it.brl; b.BRL.eur += it.eur; }
+      else if (it.usd !== undefined) { b.USD.native += it.usd; b.USD.eur += it.eur; }
+      else { b.EUR.native += it.eur; b.EUR.eur += it.eur; }
+    });
+  });
+  return b;
+}
+
+function renderCurrencyBreakdown() {
+  const wrap = document.getElementById('currency-breakdown');
+  if (!wrap) return;
+  const b = computeCurrencyBreakdown();
+  const rows = [
+    { icon: '🇪🇺', label: 'Euro',    native: fmt(b.EUR.native), eur: null },
+    { icon: '🇧🇷', label: 'Reais',   native: fmtBRL(b.BRL.native), eur: fmt(b.BRL.eur) },
+    { icon: '🇺🇸', label: 'Dollari', native: '$ ' + Math.abs(b.USD.native).toLocaleString('it-IT', {maximumFractionDigits:0}), eur: fmt(b.USD.eur) },
+  ];
+  const keys = ['EUR','BRL','USD'];
+  wrap.innerHTML = rows.map((r,i) => {
+    const pct = totalPat ? ((b[keys[i]].eur/totalPat)*100).toFixed(1) : '0.0';
+    return `<div class="cb-row">
+      <div class="cb-icon">${r.icon}</div>
+      <div class="cb-text">
+        <div class="cb-label">${r.label}</div>
+        <div class="cb-native">${r.native}${r.eur ? ` <span class="cb-eur">(≈ ${r.eur})</span>` : ''}</div>
+      </div>
+      <div class="cb-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+}
 
 /* Aggiorna dal vivo le voci di Liquidità nel Patrimonio Netto usando le
    transazioni reali di Quick Add (richiede login, come il Flusso Mensile). */
@@ -2253,11 +2308,10 @@ function renderFlusso() {
     incRowEl.innerHTML = `<div class="transfer-pick-empty">${msg}</div>`;
     varRowEl.innerHTML = `<div class="transfer-pick-empty">${msg}</div>`;
     ['income-total','var-total','fixed-total'].forEach(id => document.getElementById(id).textContent = '—');
-    ['card-inc-val','card-var-val','card-net-val','card-fix-val'].forEach(id => document.getElementById(id).textContent = '—');
+    ['card-inc-val','card-var-val','card-fix-val'].forEach(id => document.getElementById(id).textContent = '—');
     const subMsg = flussoAuthorized===false ? 'Accedi per vedere' : 'Verifica accesso in corso…';
     document.getElementById('card-inc-sub').textContent = subMsg;
     document.getElementById('card-var-sub').textContent = subMsg;
-    document.getElementById('card-net-sub').textContent = subMsg;
     document.getElementById('deficit-val').textContent = '—';
     document.getElementById('deficit-note').textContent = msg;
     document.getElementById('deficit-months-val').textContent = '—';
@@ -2282,9 +2336,6 @@ function renderFlusso() {
   document.getElementById('card-inc-sub').textContent = `${incomes.length} ${incomes.length===1?'entrata':'entrate'} · ${monthLabelFlusso}`;
   document.getElementById('card-var-val').textContent = '−' + fmt(totalVar);
   document.getElementById('card-var-sub').textContent = `${monthLabelFlusso} · ${varExp.length} ${varExp.length===1?'voce':'voci'}`;
-  document.getElementById('card-net-val').textContent = (saldo>=0?'+':'−') + fmt(Math.abs(saldo));
-  document.getElementById('card-net-val').className = 'card-val ' + (saldo>=0?'green':'red');
-  document.getElementById('card-net-sub').textContent = saldo>=0 ? 'Surplus mensile' : 'Deficit mensile';
 
   if (!incomes.length) {
     incRowEl.innerHTML = `<div class="transfer-pick-empty">Nessuna entrata registrata per ${monthLabelFlusso}.</div>`;
