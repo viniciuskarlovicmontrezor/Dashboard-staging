@@ -777,6 +777,7 @@ window.changeInstallments = function(delta) {
   numRate = Math.max(2, Math.min(60, numRate + delta));
   document.getElementById('installment-count').textContent = numRate;
   updateInstallmentPreview();
+  updateSubmitLabel();
 };
 
 function updateSubmitLabel() {
