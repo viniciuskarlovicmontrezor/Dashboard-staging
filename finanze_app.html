@@ -179,7 +179,10 @@
   #dashboard-view .card-val { font-size: 1.15rem; font-weight: 800; }
   #dashboard-view .card-sub { font-size: 0.65rem; color: #475569; margin-top: 3px; }
 
-  #dashboard-view .two-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  /* Entrate + Spese Variabili affiancate (2 colonne); Costi Fissi ha la sua
+     riga a tutta larghezza subito sopra (vedi .fixed-costs-full). */
+  #dashboard-view .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  #dashboard-view .fixed-costs-full { margin-bottom: 16px; }
   #dashboard-view .section-card { background: #1a1d2e; border-radius: 13px; padding: 16px 18px; border: 1px solid #2d3148; }
   #dashboard-view .section-title { font-size: 0.78rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
   #dashboard-view .section-total { font-size: 0.85rem; font-weight: 800; }
@@ -280,6 +283,21 @@
   #quickadd-view .acc-btn .acc-bal { font-size:0.62rem; color:var(--muted); margin-top:1px; }
   #quickadd-view .acc-btn.selected { border-color:var(--orange); background:rgba(245,158,11,0.1); }
   #quickadd-view .acc-btn.selected .acc-bal { color:var(--orange); }
+
+  /* Pagamento rateizzato: crea un Costo Fisso a scadenza automatica invece di una
+     transazione singola (vedi submitTx / task rateizzazione). */
+  #quickadd-view .installment-row { width:100%; max-width:420px; margin-bottom:14px; }
+  #quickadd-view .installment-check { display:flex; align-items:center; gap:9px; font-size:0.8rem; color:var(--muted); cursor:pointer; padding:11px 15px; background:var(--surface); border:1.5px solid var(--border); border-radius:12px; }
+  #quickadd-view .installment-check input { width:16px; height:16px; accent-color:var(--purple); cursor:pointer; }
+  #quickadd-view .installment-fields { margin-top:8px; background:var(--surface); border:1.5px solid var(--border); border-radius:12px; padding:12px 15px; }
+  #quickadd-view .installment-stepper-row { display:flex; align-items:center; justify-content:space-between; }
+  #quickadd-view .installment-stepper-label { font-size:0.78rem; color:var(--muted); }
+  #quickadd-view .installment-stepper { display:flex; align-items:center; gap:12px; }
+  #quickadd-view .installment-step-btn { width:30px; height:30px; border-radius:9px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); font-size:1.05rem; font-weight:700; cursor:pointer; }
+  #quickadd-view .installment-step-btn:active { transform:scale(0.92); }
+  #quickadd-view #installment-count { font-size:0.92rem; font-weight:700; min-width:20px; text-align:center; }
+  #quickadd-view .installment-preview { margin-top:9px; font-size:0.74rem; color:var(--purple-light); text-align:center; min-height:14px; }
+
   #quickadd-view .submit-btn { width:100%; max-width:420px; padding:17px; border-radius:var(--radius); border:none; font-size:1rem; font-weight:700; cursor:pointer; transition:all 0.18s; margin-bottom:14px; letter-spacing:0.02em; }
   #quickadd-view .submit-btn.expense { background:var(--red); color:white; }
   #quickadd-view .submit-btn.income  { background:var(--green); color:white; }
@@ -409,6 +427,24 @@
 
 <div class="section-label">Conto</div>
 <div class="accounts" id="accounts"></div>
+
+<div class="installment-row" id="installment-row" style="display:none;">
+  <label class="installment-check">
+    <input type="checkbox" id="installment-check" onchange="toggleInstallment()">
+    📅 Pagamento rateizzato (es. elettrodomestico a rate)
+  </label>
+  <div class="installment-fields" id="installment-fields" style="display:none;">
+    <div class="installment-stepper-row">
+      <span class="installment-stepper-label">Numero di rate</span>
+      <div class="installment-stepper">
+        <button type="button" class="installment-step-btn" onclick="changeInstallments(-1)">−</button>
+        <span id="installment-count">3</span>
+        <button type="button" class="installment-step-btn" onclick="changeInstallments(1)">+</button>
+      </div>
+    </div>
+    <div class="installment-preview" id="installment-preview"></div>
+  </div>
+</div>
 
 <button class="submit-btn expense" id="submit-btn" onclick="submitTx()" disabled>Registra Uscita</button>
 
@@ -553,10 +589,28 @@ onAuthStateChanged(auth, (user) => {
 
 // ===== STATE =====
 let type = 'expense', currency = 'EUR', symbol = '€', amountRaw = '', selCat = '', selAcc = '';
+// Pagamento rateizzato: invece di una transazione singola, crea un Costo Fisso
+// che scade da solo dopo N mesi (riusa cancelledFromMonth, stesso meccanismo
+// gia' usato per le cancellazioni manuali nel Flusso Mensile).
+let rateizzato = false, numRate = 3;
 
 // Tassi di cambio (allineati al dashboard)
 const RATES = { EUR: 1, BRL: 5.92, USD: 1.1371 };
 function toEur(amount, cur) { return amount / RATES[cur]; }
+function round2(n) { return Math.round(n * 100) / 100; }
+
+// Piccola copia locale di addMonthsToKey/monthKeyLabel (definite anche nello script
+// della Dashboard, ma quello e' un modulo separato: duplichiamo qui queste due
+// funzioni pure per non dipendere dall'ordine di esecuzione tra i due script).
+function addMonthsToKeyQA(monthKey, n) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function monthKeyLabelQA(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month:'short', year:'numeric' });
+}
 
 // Date
 const now = new Date();
@@ -697,6 +751,43 @@ function updatePctDisplay() {
   el.className = 'amount-pct' + (pct >= 100 ? ' danger' : pct >= 50 ? ' warn' : '');
 }
 
+// Mostra l'anteprima "≈ X/mese per N mesi (mese1–mese2)" quando il pagamento
+// rateizzato e' attivo: l'importo sul tastierino e' il prezzo TOTALE, qui si
+// calcola quanto entrera' come Costo Fisso ogni mese e per quanti mesi.
+function updateInstallmentPreview() {
+  const el = document.getElementById('installment-preview');
+  if (!el) return;
+  const amt = parseFloat(amountRaw);
+  if (!rateizzato || !amt || amt <= 0) { el.textContent = ''; return; }
+  const perRata = amt / numRate;
+  const endMonth = addMonthsToKeyQA(monthKey, numRate - 1);
+  const perRataStr = perRata.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+  el.textContent = `≈ ${symbol}${perRataStr}/mese per ${numRate} mesi (${monthKeyLabelQA(monthKey)}–${monthKeyLabelQA(endMonth)})`;
+}
+
+window.toggleInstallment = function() {
+  rateizzato = document.getElementById('installment-check').checked;
+  document.getElementById('installment-fields').style.display = rateizzato ? 'block' : 'none';
+  updateInstallmentPreview();
+  updateSubmitLabel();
+  updateSubmitState();
+};
+
+window.changeInstallments = function(delta) {
+  numRate = Math.max(2, Math.min(60, numRate + delta));
+  document.getElementById('installment-count').textContent = numRate;
+  updateInstallmentPreview();
+};
+
+function updateSubmitLabel() {
+  const sb = document.getElementById('submit-btn');
+  if (type === 'expense' && rateizzato) {
+    sb.textContent = `Registra Costo Fisso (${numRate} rate)`;
+  } else {
+    sb.textContent = type==='expense' ? 'Registra Uscita' : 'Registra Entrata';
+  }
+}
+
 function renderCats() {
   const cats = type==='expense' ? expCats : incCats;
   const el = document.getElementById('cats');
@@ -733,7 +824,20 @@ window.setType = function(t) {
   document.getElementById('amount-display').className='amount-value '+t;
   const sb=document.getElementById('submit-btn');
   sb.className='submit-btn '+t;
-  sb.textContent=t==='expense'?'Registra Uscita':'Registra Entrata';
+  // Il pagamento rateizzato ha senso solo per le uscite: passando a Entrata si
+  // nasconde e si disattiva automaticamente.
+  const instRow = document.getElementById('installment-row');
+  if (t === 'expense') {
+    instRow.style.display = 'block';
+  } else {
+    instRow.style.display = 'none';
+    rateizzato = false;
+    document.getElementById('installment-check').checked = false;
+    document.getElementById('installment-fields').style.display = 'none';
+  }
+  updateSubmitLabel();
+  updateInstallmentPreview();
+  updateSubmitState();
   renderCats();
 };
 
@@ -754,6 +858,7 @@ window.numPress = function(v) {
   document.getElementById('amount-text').textContent=amountRaw||'0';
   updateSubmitState();
   updatePctDisplay();
+  updateInstallmentPreview();
 };
 
 window.numDel = function() {
@@ -761,19 +866,20 @@ window.numDel = function() {
   document.getElementById('amount-text').textContent=amountRaw||'0';
   updateSubmitState();
   updatePctDisplay();
+  updateInstallmentPreview();
 };
 
 function updateSubmitState() {
-  document.getElementById('submit-btn').disabled = !(parseFloat(amountRaw)>0 && selAcc!=='');
+  // Un pagamento rateizzato crea un Costo Fisso (non legato a un conto specifico
+  // nel modello dati attuale): non richiede quindi la selezione del Conto.
+  const accOk = rateizzato || selAcc !== '';
+  document.getElementById('submit-btn').disabled = !(parseFloat(amountRaw)>0 && accOk);
 }
 
 window.submitTx = async function submitTx() {
   const amt = parseFloat(amountRaw);
-  if(!amt||!selAcc) return;
-  const acc = accs.find(a=>a.id===selAcc);
-  const desc = document.getElementById('desc').value.trim() || selCat || 'Transazione';
-  const cat = selCat || '📦 Altro';
-  const amountEur = toEur(amt, currency);
+  const isInstallment = type === 'expense' && rateizzato;
+  if(!amt || (!isInstallment && !selAcc)) return;
 
   const statusEl = document.getElementById('ai-status');
   statusEl.className='ai-status loading';
@@ -783,36 +889,88 @@ window.submitTx = async function submitTx() {
   submitBtn.disabled = true;
 
   try {
-    await addDoc(collection(db, 'transactions'), {
-      type,                       // 'expense' | 'income'
-      amount: amt,
-      currency,
-      amountEur,
-      description: desc,
-      category: cat,
-      account: acc.name,
-      date: `${dd}/${mm}/${yyyy}`,
-      month: monthKey,
-      createdAt: serverTimestamp()
-    });
+    if (isInstallment) {
+      // Pagamento rateizzato: NON e' una transazione (non tocca saldo conto/log
+      // di oggi), ma un Costo Fisso che compare nel Flusso Mensile per N mesi a
+      // partire da questo mese, e sparisce da solo dopo (cancelledFromMonth).
+      const desc = document.getElementById('desc').value.trim() || selCat || 'Acquisto rateizzato';
+      const totalEur = round2(toEur(amt, currency));
+      const perRataEur = round2(totalEur / numRate);
+      const icon = selCat ? selCat.split(' ')[0] : '📅';
+      const catText = selCat ? selCat.split(' ').slice(1).join(' ') : 'Altro';
 
-    statusEl.className='ai-status success';
-    document.getElementById('ai-status-text').textContent='✅ Salvato sul dashboard!';
-    setTimeout(()=>{ statusEl.className='ai-status'; },2500);
+      await addDoc(collection(db, 'fixed_expenses'), {
+        name: desc,
+        icon,
+        cat: catText,
+        eur: perRataEur,
+        cancelledFromMonth: addMonthsToKeyQA(monthKey, numRate),
+        installments: numRate,
+        totalAmount: totalEur,
+        startMonth: monthKey,
+        order: Date.now(),
+        createdAt: serverTimestamp()
+      });
 
-    const sign = type==='expense'?'−':'+';
-    showToast(`${sign}${symbol}${amt.toFixed(2).replace('.',',')} registrato ✅`);
+      statusEl.className='ai-status success';
+      document.getElementById('ai-status-text').textContent='✅ Costo fisso rateizzato registrato!';
+      setTimeout(()=>{ statusEl.className='ai-status'; },2500);
 
-    // Aggiorna subito Dashboard (Flusso Mensile) e saldo dei conti
-    window.dispatchEvent(new CustomEvent('fin-transactions-changed'));
-    refreshAccountBalances();
+      const perRataStr = perRataEur.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+      showToast(`📅 ${numRate} rate da ${symbol}${perRataStr}/mese registrate ✅`);
 
-    // Reset form
-    amountRaw='';
-    document.getElementById('amount-text').textContent='0';
-    document.getElementById('desc').value='';
-    selCat=''; renderCats();
-    updatePctDisplay();
+      window.dispatchEvent(new CustomEvent('fin-transactions-changed'));
+
+      // Reset form (incluso il rateizzato, che torna disattivato)
+      amountRaw='';
+      document.getElementById('amount-text').textContent='0';
+      document.getElementById('desc').value='';
+      selCat=''; renderCats();
+      updatePctDisplay();
+      rateizzato = false;
+      document.getElementById('installment-check').checked = false;
+      document.getElementById('installment-fields').style.display = 'none';
+      numRate = 3;
+      document.getElementById('installment-count').textContent = numRate;
+      updateInstallmentPreview();
+      updateSubmitLabel();
+    } else {
+      const acc = accs.find(a=>a.id===selAcc);
+      const desc = document.getElementById('desc').value.trim() || selCat || 'Transazione';
+      const cat = selCat || '📦 Altro';
+      const amountEur = toEur(amt, currency);
+
+      await addDoc(collection(db, 'transactions'), {
+        type,                       // 'expense' | 'income'
+        amount: amt,
+        currency,
+        amountEur,
+        description: desc,
+        category: cat,
+        account: acc.name,
+        date: `${dd}/${mm}/${yyyy}`,
+        month: monthKey,
+        createdAt: serverTimestamp()
+      });
+
+      statusEl.className='ai-status success';
+      document.getElementById('ai-status-text').textContent='✅ Salvato sul dashboard!';
+      setTimeout(()=>{ statusEl.className='ai-status'; },2500);
+
+      const sign = type==='expense'?'−':'+';
+      showToast(`${sign}${symbol}${amt.toFixed(2).replace('.',',')} registrato ✅`);
+
+      // Aggiorna subito Dashboard (Flusso Mensile) e saldo dei conti
+      window.dispatchEvent(new CustomEvent('fin-transactions-changed'));
+      refreshAccountBalances();
+
+      // Reset form
+      amountRaw='';
+      document.getElementById('amount-text').textContent='0';
+      document.getElementById('desc').value='';
+      selCat=''; renderCats();
+      updatePctDisplay();
+    }
   } catch (e) {
     console.error(e);
     statusEl.className='ai-status error';
@@ -903,6 +1061,8 @@ window.exportBackup = async function() {
 };
 
 renderCats(); renderAccounts();
+// Il tipo iniziale e' 'expense': mostra subito la riga del rateizzato.
+document.getElementById('installment-row').style.display = type === 'expense' ? 'block' : 'none';
 </script>
 
 </div><!-- /quickadd-view -->
@@ -1032,6 +1192,17 @@ renderCats(); renderAccounts();
     </div>
   </div>
 
+  <!-- Costi Fissi: a tutta larghezza (lista spesso piu' lunga, con toggle
+       pagato/rate/cancellazione: sta piu' comoda su una riga sola larga che
+       schiacciata in una delle 3 colonne strette di prima). -->
+  <div class="section-card fixed-costs-full">
+    <div class="section-title">
+      <span class="red">🔴 COSTI FISSI</span>
+      <span class="section-total red" id="fixed-total">…</span>
+    </div>
+    <div class="flow-row-item" id="expense-rows"></div>
+  </div>
+
   <div class="two-col">
     <!-- Entrate -->
     <div class="section-card">
@@ -1040,14 +1211,6 @@ renderCats(); renderAccounts();
         <span class="section-total green" id="income-total">…</span>
       </div>
       <div class="flow-row-item" id="income-rows"></div>
-    </div>
-    <!-- Costi Fissi -->
-    <div class="section-card">
-      <div class="section-title">
-        <span class="red">🔴 COSTI FISSI</span>
-        <span class="section-total red" id="fixed-total">…</span>
-      </div>
-      <div class="flow-row-item" id="expense-rows"></div>
     </div>
     <!-- Spese Variabili -->
     <div class="section-card" style="border-color:#fb923c44;">
@@ -1978,6 +2141,9 @@ updateMonthNavUI();
 window.addEventListener('fin-transactions-changed', () => {
   if (flussoAuthorized) {
     loadFlussoLive();
+    // Un pagamento rateizzato registrato in Quick Add crea un nuovo Costo Fisso:
+    // ricarichiamo anche questi cosi' compare subito, senza dover cambiare tab.
+    loadFixedExpenses();
     refreshPatrimonioLiquidity();
   }
 });
@@ -2012,8 +2178,14 @@ function renderFixedRows() {
     const statusHtml = item.cancelledFromMonth
       ? `<div class="fix-cancelled-tag">🚫 Cancellato da ${monthKeyLabel(item.cancelledFromMonth)} <span class="fix-undo-link" onclick="undoCancelFixedExpense('${item.id}')">Annulla</span></div>`
       : `<span class="fix-paid-toggle ${item.paid?'paid':'unpaid'}" onclick="toggleFixedPaid('${item.id}')">${item.paid?'✅ Pagato':'⭕ Da pagare'}</span>`;
+    // Un costo fisso creato da un pagamento rateizzato in Quick Add non ha un
+    // "sub" scritto a mano: lo calcoliamo dal vivo da installments/startMonth/
+    // totalAmount, cosi' resta sempre coerente (es. "5 rate · giu-ott 2026 · tot.").
+    const subText = item.installments
+      ? `${item.installments} rate · ${monthKeyLabel(item.startMonth)}–${monthKeyLabel(addMonthsToKey(item.startMonth, item.installments - 1))} · ${fmt(item.totalAmount)} totale`
+      : (item.sub || '');
     el.innerHTML=`<div class="fi-icon">${item.icon}</div>
-      <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${item.sub}</div></div>
+      <div style="flex:1"><div class="fi-name">${item.name}<div class="fi-sub">${subText}</div></div>
       <div class="bar-track"><div class="bar-fill" style="width:0%;background:#f87171" data-w="${bW}%"></div></div>
       ${statusHtml}</div>
       <div class="fi-right"><div class="fi-val red">−${fmt(item.eur)}</div>
