@@ -484,6 +484,20 @@
   </div>
 </div>
 
+<!-- Costo fisso ricorrente: invece di registrare una singola transazione, salva
+     categoria/importo come nuovo Costo Fisso perenne (compare ogni mese nel
+     Flusso Mensile finche' non lo cancelli a mano). Mutuamente esclusivo col
+     rateizzato: sono due modi diversi di creare un Costo Fisso. -->
+<div class="installment-row" id="fixed-recurring-row" style="display:none;">
+  <label class="installment-check">
+    <input type="checkbox" id="fixed-recurring-check" onchange="toggleFixedRecurring()">
+    🔁 Costo fisso ricorrente (es. affitto, abbonamento)
+  </label>
+  <div class="installment-fields" id="fixed-recurring-fields" style="display:none;">
+    <div class="installment-preview" id="fixed-recurring-preview"></div>
+  </div>
+</div>
+
 <button class="submit-btn expense" id="submit-btn" onclick="submitTx()" disabled>Registra Uscita</button>
 
 <!-- SYNC STATUS -->
@@ -631,6 +645,9 @@ let type = 'expense', currency = 'EUR', symbol = '€', amountRaw = '', selCat =
 // che scade da solo dopo N mesi (riusa cancelledFromMonth, stesso meccanismo
 // gia' usato per le cancellazioni manuali nel Flusso Mensile).
 let rateizzato = false, numRate = 3;
+// Costo fisso ricorrente: alternativa al rateizzato, crea un Costo Fisso perenne
+// (senza installments/cancelledFromMonth), che quindi non scade da solo.
+let isFixedRecurring = false;
 
 // Tassi di cambio (allineati al dashboard)
 const RATES = { EUR: 1, BRL: 5.92, USD: 1.1371 };
@@ -829,6 +846,13 @@ function updateInstallmentPreview() {
 
 window.toggleInstallment = function() {
   rateizzato = document.getElementById('installment-check').checked;
+  if (rateizzato && isFixedRecurring) {
+    // Mutuamente esclusivo col Costo Fisso ricorrente: attivandone uno si spegne l'altro.
+    isFixedRecurring = false;
+    document.getElementById('fixed-recurring-check').checked = false;
+    document.getElementById('fixed-recurring-fields').style.display = 'none';
+    updateFixedRecurringPreview();
+  }
   document.getElementById('installment-fields').style.display = rateizzato ? 'block' : 'none';
   updateInstallmentPreview();
   updateSubmitLabel();
@@ -842,10 +866,37 @@ window.changeInstallments = function(delta) {
   updateSubmitLabel();
 };
 
+// Mostra l'anteprima "🔁 X/mese, ricorrente" quando il Costo Fisso ricorrente e' attivo.
+function updateFixedRecurringPreview() {
+  const el = document.getElementById('fixed-recurring-preview');
+  if (!el) return;
+  const amt = parseFloat(amountRaw);
+  if (!isFixedRecurring || !amt || amt <= 0) { el.textContent = ''; return; }
+  const amtStr = amt.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+  el.textContent = `🔁 ${symbol}${amtStr}/mese, ricorrente finché non lo cancelli da Flusso Mensile`;
+}
+
+window.toggleFixedRecurring = function() {
+  isFixedRecurring = document.getElementById('fixed-recurring-check').checked;
+  if (isFixedRecurring && rateizzato) {
+    // Mutuamente esclusivo col rateizzato: attivandone uno si spegne l'altro.
+    rateizzato = false;
+    document.getElementById('installment-check').checked = false;
+    document.getElementById('installment-fields').style.display = 'none';
+    updateInstallmentPreview();
+  }
+  document.getElementById('fixed-recurring-fields').style.display = isFixedRecurring ? 'block' : 'none';
+  updateFixedRecurringPreview();
+  updateSubmitLabel();
+  updateSubmitState();
+};
+
 function updateSubmitLabel() {
   const sb = document.getElementById('submit-btn');
   if (type === 'expense' && rateizzato) {
     sb.textContent = `Registra Costo Fisso (${numRate} rate)`;
+  } else if (type === 'expense' && isFixedRecurring) {
+    sb.textContent = 'Registra Costo Fisso Ricorrente';
   } else {
     sb.textContent = type==='expense' ? 'Registra Uscita' : 'Registra Entrata';
   }
@@ -887,19 +938,26 @@ window.setType = function(t) {
   document.getElementById('amount-display').className='amount-value '+t;
   const sb=document.getElementById('submit-btn');
   sb.className='submit-btn '+t;
-  // Il pagamento rateizzato ha senso solo per le uscite: passando a Entrata si
-  // nasconde e si disattiva automaticamente.
+  // Il pagamento rateizzato e il Costo Fisso ricorrente hanno senso solo per le
+  // uscite: passando a Entrata si nascondono e si disattivano automaticamente.
   const instRow = document.getElementById('installment-row');
+  const fixedRow = document.getElementById('fixed-recurring-row');
   if (t === 'expense') {
     instRow.style.display = 'block';
+    fixedRow.style.display = 'block';
   } else {
     instRow.style.display = 'none';
     rateizzato = false;
     document.getElementById('installment-check').checked = false;
     document.getElementById('installment-fields').style.display = 'none';
+    fixedRow.style.display = 'none';
+    isFixedRecurring = false;
+    document.getElementById('fixed-recurring-check').checked = false;
+    document.getElementById('fixed-recurring-fields').style.display = 'none';
   }
   updateSubmitLabel();
   updateInstallmentPreview();
+  updateFixedRecurringPreview();
   updateSubmitState();
   renderCats();
 };
@@ -922,6 +980,7 @@ window.numPress = function(v) {
   updateSubmitState();
   updatePctDisplay();
   updateInstallmentPreview();
+  updateFixedRecurringPreview();
 };
 
 window.numDel = function() {
@@ -930,19 +989,22 @@ window.numDel = function() {
   updateSubmitState();
   updatePctDisplay();
   updateInstallmentPreview();
+  updateFixedRecurringPreview();
 };
 
 function updateSubmitState() {
-  // Un pagamento rateizzato crea un Costo Fisso (non legato a un conto specifico
-  // nel modello dati attuale): non richiede quindi la selezione del Conto.
-  const accOk = rateizzato || selAcc !== '';
+  // Un pagamento rateizzato o un Costo Fisso ricorrente creano un Costo Fisso
+  // (non legato a un conto specifico nel modello dati attuale): non richiedono
+  // quindi la selezione del Conto.
+  const accOk = rateizzato || isFixedRecurring || selAcc !== '';
   document.getElementById('submit-btn').disabled = !(parseFloat(amountRaw)>0 && accOk);
 }
 
 window.submitTx = async function submitTx() {
   const amt = parseFloat(amountRaw);
   const isInstallment = type === 'expense' && rateizzato;
-  if(!amt || (!isInstallment && !selAcc)) return;
+  const isFixedRecurringSubmit = type === 'expense' && isFixedRecurring && !rateizzato;
+  if(!amt || (!isInstallment && !isFixedRecurringSubmit && !selAcc)) return;
 
   const statusEl = document.getElementById('ai-status');
   statusEl.className='ai-status loading';
@@ -996,6 +1058,46 @@ window.submitTx = async function submitTx() {
       numRate = 3;
       document.getElementById('installment-count').textContent = numRate;
       updateInstallmentPreview();
+      updateSubmitLabel();
+    } else if (isFixedRecurringSubmit) {
+      // Costo fisso ricorrente: come il rateizzato, NON e' una transazione ma un
+      // Costo Fisso — pero' senza installments/cancelledFromMonth, quindi non
+      // scade da solo: rimane ogni mese nel Flusso Mensile finche' non viene
+      // cancellato a mano dalla scheda Costi Fissi.
+      const desc = document.getElementById('desc').value.trim() || selCat || 'Costo fisso';
+      const eur = round2(toEur(amt, currency));
+      const icon = selCat ? selCat.split(' ')[0] : '📌';
+      const catText = selCat ? selCat.split(' ').slice(1).join(' ') : 'Altro';
+
+      await addDoc(collection(db, 'fixed_expenses'), {
+        name: desc,
+        icon,
+        cat: catText,
+        eur,
+        cancelledFromMonth: null,
+        order: Date.now(),
+        createdAt: serverTimestamp()
+      });
+
+      statusEl.className='ai-status success';
+      document.getElementById('ai-status-text').textContent='✅ Costo fisso registrato!';
+      setTimeout(()=>{ statusEl.className='ai-status'; },2500);
+
+      const eurStr = eur.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+      showToast(`🔁 Costo fisso ${symbol}${eurStr}/mese registrato ✅`);
+
+      window.dispatchEvent(new CustomEvent('fin-transactions-changed'));
+
+      // Reset form (incluso il Costo Fisso ricorrente, che torna disattivato)
+      amountRaw='';
+      document.getElementById('amount-text').textContent='0';
+      document.getElementById('desc').value='';
+      selCat=''; renderCats();
+      updatePctDisplay();
+      isFixedRecurring = false;
+      document.getElementById('fixed-recurring-check').checked = false;
+      document.getElementById('fixed-recurring-fields').style.display = 'none';
+      updateFixedRecurringPreview();
       updateSubmitLabel();
     } else {
       const acc = accs.find(a=>a.id===selAcc);
@@ -1132,8 +1234,9 @@ window.exportBackup = async function() {
 };
 
 renderCats(); renderAccounts();
-// Il tipo iniziale e' 'expense': mostra subito la riga del rateizzato.
+// Il tipo iniziale e' 'expense': mostra subito la riga del rateizzato e del Costo Fisso ricorrente.
 document.getElementById('installment-row').style.display = type === 'expense' ? 'block' : 'none';
+document.getElementById('fixed-recurring-row').style.display = type === 'expense' ? 'block' : 'none';
 </script>
 
 </div><!-- /quickadd-view -->
