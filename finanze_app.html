@@ -164,6 +164,13 @@
   }
 
   /* ===== FLUSSO ===== */
+  /* Navigazione mese/anno (task #18): frecce avanti/indietro sopra le card. */
+  #dashboard-view .month-nav { display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:14px; }
+  #dashboard-view .month-nav-btn { background:#1a1d2e; border:1px solid #2d3148; color:#a78bfa; font-size:1rem; font-weight:700; width:36px; height:36px; border-radius:10px; cursor:pointer; transition:all 0.15s; flex-shrink:0; }
+  #dashboard-view .month-nav-btn:hover { border-color:#a78bfa; background:#1e1b4b; }
+  #dashboard-view .month-nav-btn:active { transform:scale(0.93); }
+  #dashboard-view .month-nav-current { font-size:0.95rem; font-weight:700; color:#e2e8f0; min-width:170px; text-align:center; text-transform:capitalize; }
+  #dashboard-view .month-nav-today-hint { display:block; font-size:0.62rem; font-weight:500; color:#64748b; text-transform:none; margin-top:2px; }
   #dashboard-view .cards {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px;
   }
@@ -996,6 +1003,12 @@ renderCats(); renderAccounts();
 <!-- ===== TAB 2: FLUSSO ===== -->
 <div class="tab-content" id="tab-flusso">
 
+  <div class="month-nav">
+    <button class="month-nav-btn" onclick="navigateFlussoMonth(-1)" title="Mese precedente">◀</button>
+    <div class="month-nav-current" id="month-nav-current">…</div>
+    <button class="month-nav-btn" onclick="navigateFlussoMonth(1)" title="Mese successivo">▶</button>
+  </div>
+
   <div class="cards">
     <div class="card">
       <div class="card-label">✅ Entrate</div>
@@ -1056,7 +1069,7 @@ renderCats(); renderAccounts();
   <div class="deficit-box">
     <div class="deficit-icon">⚠️</div>
     <div class="deficit-text">
-      <div class="deficit-lbl">SALDO MENSILE CORRENTE</div>
+      <div class="deficit-lbl">SALDO DEL MESE</div>
       <div class="deficit-val" id="deficit-val">…</div>
       <div class="deficit-note" id="deficit-note">Verifica accesso in corso…</div>
     </div>
@@ -1735,8 +1748,18 @@ let varExp = null;
 let flussoAuthorized = null;
 
 const nowFlusso = new Date();
-const monthKeyFlusso = `${nowFlusso.getFullYear()}-${String(nowFlusso.getMonth()+1).padStart(2,'0')}`;
-const monthLabelFlusso = nowFlusso.toLocaleDateString('it-IT', { month:'long', year:'numeric' });
+// task #18: monthKeyFlusso/monthLabelFlusso non sono piu' costanti fisse sul mese
+// odierno, ma lo stato di navigazione corrente del Flusso Mensile (un mese alla
+// volta, mai vista aggregata). Tutte le funzioni sottostanti (loadFlussoLive,
+// loadFixedExpenses, deleteFlussoTx, toggleFixedPaid, ecc.) le leggevano gia'
+// come variabili: cambiandole e richiamando i loader si spostano automaticamente
+// sul mese mostrato, senza bisogno di toccare quella logica.
+const todayMonthKeyFlusso = `${nowFlusso.getFullYear()}-${String(nowFlusso.getMonth()+1).padStart(2,'0')}`;
+let monthKeyFlusso = todayMonthKeyFlusso;
+let monthLabelFlusso = nowFlusso.toLocaleDateString('it-IT', { month:'long', year:'numeric' });
+// Saldo di partenza del mese mostrato: somma cumulativa (entrate - spese variabili
+// - costi fissi) di tutti i mesi precedenti. null = non ancora calcolato.
+let saldoIniziale = null;
 
 function extractIcon(catStr) { return catStr ? (catStr.split(' ')[0] || '📦') : '📦'; }
 function stripIcon(catStr) { return catStr ? catStr.split(' ').slice(1).join(' ') : ''; }
@@ -1809,6 +1832,83 @@ async function loadFixedExpenses() {
   renderFlusso();
 }
 
+// Calcola il saldo di partenza del mese mostrato: somma cumulativa (entrate - spese
+// variabili - costi fissi) di TUTTI i mesi precedenti a targetMonthKey, a partire
+// dal primo mese che ha almeno una transazione registrata. E' un calcolo live (non
+// uno snapshot salvato): se correggi dati di un mese passato il riporto si aggiorna
+// da solo la prossima volta che viene ricalcolato, senza bisogno di "chiudere" i mesi
+// a mano. I costi fissi di ogni mese passato sono stimati con l'importo attuale dei
+// template, applicando lo stesso filtro cancelledFromMonth usato per il mese corrente
+// (il modello dati non versiona storicamente gli importi, coerente col resto dell'app).
+async function computeSaldoIniziale(targetMonthKey) {
+  if (!flussoAuthorized || !window.__fin) return null;
+  try {
+    const { db, collection, getDocs } = window.__fin;
+    const [txSnap, fixedSnap] = await Promise.all([
+      getDocs(collection(db, 'transactions')),
+      getDocs(collection(db, 'fixed_expenses'))
+    ]);
+    const perMonth = {};
+    let minMonth = null;
+    txSnap.forEach(docSnap => {
+      const d = docSnap.data();
+      const m = d.month;
+      if (!m || m >= targetMonthKey) return; // solo mesi strettamente precedenti
+      if (minMonth === null || m < minMonth) minMonth = m;
+      if (!perMonth[m]) perMonth[m] = { inc: 0, vr: 0 };
+      const amt = Number(d.amountEur) || 0;
+      if (d.type === 'income') perMonth[m].inc += amt; else perMonth[m].vr += amt;
+    });
+    if (minMonth === null) return 0; // nessun mese precedente con dati: si parte da zero
+
+    const templates = [];
+    fixedSnap.forEach(docSnap => templates.push({ id: docSnap.id, ...docSnap.data() }));
+
+    let saldo = 0;
+    let m = minMonth;
+    while (m < targetMonthKey) {
+      const rec = perMonth[m] || { inc: 0, vr: 0 };
+      const fixForMonth = templates
+        .filter(t => !t.cancelledFromMonth || t.cancelledFromMonth > m)
+        .reduce((s,t) => s + (Number(t.eur) || 0), 0);
+      saldo += rec.inc - rec.vr - fixForMonth;
+      m = addMonthsToKey(m, 1);
+    }
+    return saldo;
+  } catch (e) {
+    console.error('Errore calcolo saldo iniziale:', e);
+    return null;
+  }
+}
+
+// Aggiorna l'etichetta del mese nell'header di navigazione del Flusso Mensile.
+function updateMonthNavUI() {
+  const label = document.getElementById('month-nav-current');
+  if (!label) return;
+  label.textContent = monthKeyFlusso === todayMonthKeyFlusso
+    ? `${monthLabelFlusso} (in corso)`
+    : monthLabelFlusso;
+}
+
+// Naviga di un mese avanti (delta=1) o indietro (delta=-1). Un mese alla volta,
+// mai vista aggregata multi-mese (requisito task #18). Ricarica entrate/spese/costi
+// fissi per il nuovo mese e ricalcola il saldo di partenza riportato.
+window.navigateFlussoMonth = async function(delta) {
+  monthKeyFlusso = addMonthsToKey(monthKeyFlusso, delta);
+  monthLabelFlusso = monthKeyLabel(monthKeyFlusso);
+  updateMonthNavUI();
+  incomes = null; varExp = null; fixedExp = null; saldoIniziale = null;
+  renderFlusso();
+  if (!flussoAuthorized) return;
+  const [, , iniziale] = await Promise.all([
+    loadFlussoLive(),
+    loadFixedExpenses(),
+    computeSaldoIniziale(monthKeyFlusso)
+  ]);
+  saldoIniziale = iniziale;
+  renderFlusso();
+};
+
 // Segna/toglie il pagamento di un Costo Fisso per il mese corrente.
 window.toggleFixedPaid = async function(id) {
   if (!window.__fin) return;
@@ -1863,11 +1963,14 @@ window.addEventListener('fin-auth-changed', (e) => {
     loadFlussoLive();
     loadFixedExpenses();
     refreshPatrimonioLiquidity();
+    computeSaldoIniziale(monthKeyFlusso).then(v => { saldoIniziale = v; renderFlusso(); });
   } else {
-    incomes = null; varExp = null; fixedExp = null;
+    incomes = null; varExp = null; fixedExp = null; saldoIniziale = null;
     renderFlusso();
   }
 });
+
+updateMonthNavUI();
 
 // Ogni volta che una transazione viene registrata o eliminata in Quick Add,
 // aggiorna subito il Flusso Mensile e la Liquidità nel Patrimonio Netto
@@ -1920,7 +2023,7 @@ function renderFixedRows() {
   });
 }
 
-function renderWaterfall(totalIncOrNull, totalVar, saldo) {
+function renderWaterfall(totalIncOrNull, totalVar, saldo, saldoInizialeVal) {
   const wfEl = document.getElementById('waterfall');
   wfEl.innerHTML = '';
   if (totalIncOrNull === null) {
@@ -1928,12 +2031,23 @@ function renderWaterfall(totalIncOrNull, totalVar, saldo) {
     return;
   }
   const totalInc = totalIncOrNull;
-  const wfData = [{label:'✅ Entrate', val: totalInc, color:'#34d399'}];
+  // task #18: se il saldo di partenza e' gia' stato calcolato, lo mostriamo come primo
+  // passo della cascata e il "Saldo Finale" diventa cumulativo (iniziale + saldo del
+  // mese) — cioe' esattamente il valore che diventera' il saldo di partenza del mese
+  // successivo quando ci si naviga.
+  const haveIniziale = saldoInizialeVal !== null && saldoInizialeVal !== undefined;
+  const iniziale = haveIniziale ? saldoInizialeVal : 0;
+  const finale = haveIniziale ? iniziale + saldo : saldo;
+  const wfData = [];
+  if (haveIniziale) {
+    wfData.push({ label: '💰 Saldo Iniziale', val: iniziale, color: iniziale>=0 ? '#a78bfa' : '#f87171' });
+  }
+  wfData.push({label:'✅ Entrate', val: totalInc, color:'#34d399'});
   fixedExp.forEach(item => wfData.push({ label: `${item.icon} ${item.name}`, val: -item.eur, color:'#f87171' }));
   wfData.push({ label: '🛒 Spese variabili', val: -totalVar, color:'#fb923c' });
-  wfData.push({ label: '⚖️ Saldo Finale', val: saldo, color: saldo>=0 ? '#34d399' : '#f87171' });
+  wfData.push({ label: haveIniziale ? '⚖️ Saldo Finale (riportato)' : '⚖️ Saldo Finale', val: finale, color: finale>=0 ? '#34d399' : '#f87171' });
 
-  const maxWF = Math.max(totalInc, 1);
+  const maxWF = Math.max(totalInc, Math.abs(iniziale), Math.abs(finale), 1);
   wfData.forEach(d=>{
     const w=Math.abs((d.val/maxWF)*100).toFixed(1);
     const sign=d.val>0?'+':'−';
@@ -1959,7 +2073,8 @@ function renderFlusso() {
   incRowEl.innerHTML = ''; varRowEl.innerHTML = '';
 
   const locked = incomes === null || varExp === null || fixedExp === null;
-  if (locked) {
+
+ if (locked) {
     const msg = flussoAuthorized === false
       ? '🔒 Accedi con Google in Quick Add per vedere qui le entrate/spese variabili registrate.'
       : '⏳ Verifica accesso in corso…';
@@ -2048,7 +2163,7 @@ function renderFlusso() {
     document.getElementById('deficit-months-val').textContent = '—';
   }
 
-  renderWaterfall(totalInc, totalVar, saldo);
+  renderWaterfall(totalInc, totalVar, saldo, saldoIniziale);
 
   setTimeout(()=>{
     document.querySelectorAll('#dashboard-view .bar-fill, #dashboard-view .wf-bar').forEach(b=>{
