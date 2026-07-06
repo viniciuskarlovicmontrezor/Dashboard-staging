@@ -2742,11 +2742,16 @@ renderFlusso();
    browser, non esiste un backend/cron in questo progetto - vedi PROGETTO.md).
    Fonti gratuite, nessuna chiave API richiesta:
    - Bitcoin: CoinGecko (CORS diretto)
-   - Azioni/FII B3 (Brasile): brapi.dev (CORS diretto, pensato per questo uso)
-   - Azioni USA: Yahoo Finance quote endpoint, tramite proxy CORS pubblico con
-     fallback a piu' proxy (l'endpoint Yahoo non manda sempre header CORS)
+   - Azioni/FII B3 (Brasile): brapi.dev, con token gratuito personale
+   - Azioni USA: Finnhub.io, con token gratuito personale
    Se una fonte fallisce, si mantiene l'ultimo prezzo noto (cache in localStorage)
-   invece di azzerare il valore: un errore di rete non deve mai far sparire un dato. */
+   invece di azzerare il valore: un errore di rete non deve mai far sparire un dato.
+   NOTA: essendo questa una pagina statica senza backend, i due token restano
+   visibili nel codice sorgente pubblico della pagina (nessun modo di nasconderli
+   in un'app client-side pura). Non danno accesso a conti o denaro, solo alla
+   quota di richieste gratuite dei due servizi - rischio accettato dall'utente. */
+const FINNHUB_TOKEN = 'd95qmk1r01qgd5f4b4kgd95qmk1r01qgd5f4b4l0';
+const BRAPI_TOKEN = 'tgF9MMxzgHq4DBEApNqRff';
 const MARKET_PRICE_CACHE_KEY = 'market_price_cache_v1';
 let MARKET_PRICES = {};
 (function loadMarketPriceCache(){
@@ -2760,41 +2765,37 @@ function getInvestCategory() {
   return categories.find(c => c.label.indexOf('Investimenti') !== -1);
 }
 
-async function fetchJsonWithFallback(urls) {
-  for (const url of urls) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      return await res.json();
-    } catch(e) { /* prova la url successiva della catena */ }
-  }
-  return null;
-}
-
+/* Finnhub (azioni USA): il piano gratuito supporta un solo ticker per
+   richiesta (nessun batch), quindi si fa una chiamata per ticker in parallelo -
+   comunque ben dentro il limite di 60 richieste/minuto anche con refresh orario. */
 async function fetchUsPrices(tickers) {
   if (!tickers.length) return {};
-  const target = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers.join(',')}`;
-  const data = await fetchJsonWithFallback([
-    target,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-    `https://corsproxy.io/?${encodeURIComponent(target)}`
-  ]);
   const out = {};
-  try {
-    const results = (data && data.quoteResponse && data.quoteResponse.result) || [];
-    results.forEach(r => { if (r.symbol && typeof r.regularMarketPrice === 'number') out[r.symbol] = r.regularMarketPrice; });
-  } catch(e) { console.error('Errore parsing quotazioni USA:', e); }
+  await Promise.all(tickers.map(async (t) => {
+    try {
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(t)}&token=${FINNHUB_TOKEN}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && typeof data.c === 'number' && data.c > 0) out[t] = data.c;
+    } catch(e) { console.error(`Errore quotazione USA ${t} (Finnhub):`, e); }
+  }));
   return out;
 }
 
+/* brapi.dev (azioni/FII B3): il piano gratuito col token personale permette
+   un solo ativo per richiesta, quindi anche qui una chiamata per ticker. */
 async function fetchB3Prices(tickers) {
   if (!tickers.length) return {};
   const out = {};
-  try {
-    const res = await fetch(`https://brapi.dev/api/quote/${tickers.join(',')}`);
-    const data = await res.json();
-    (data.results || []).forEach(r => { if (r.symbol && typeof r.regularMarketPrice === 'number') out[r.symbol] = r.regularMarketPrice; });
-  } catch(e) { console.error('Errore quotazioni B3 (brapi.dev):', e); }
+  await Promise.all(tickers.map(async (t) => {
+    try {
+      const res = await fetch(`https://brapi.dev/api/quote/${encodeURIComponent(t)}?token=${BRAPI_TOKEN}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const r = data && data.results && data.results[0];
+      if (r && typeof r.regularMarketPrice === 'number') out[t] = r.regularMarketPrice;
+    } catch(e) { console.error(`Errore quotazione B3 ${t} (brapi.dev):`, e); }
+  }));
   return out;
 }
 
