@@ -1285,6 +1285,10 @@ document.getElementById('fixed-recurring-row').style.display = type === 'expense
     <div class="total-label">💰 Patrimonio Netto Totale</div>
     <div class="total-value">€ 315.210</div>
     <div class="total-note">Immobili · Precatório · Investimenti · Liquidità</div>
+    <div class="market-status-row" style="margin-top:8px;font-size:0.68rem;color:#94a3b8;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+      <span id="market-status-text">📊 Prezzi mercato: in caricamento…</span>
+      <button onclick="refreshMarketPrices(true)" style="background:none;border:1px solid #475569;color:#cbd5e1;border-radius:6px;padding:2px 8px;font-size:0.65rem;cursor:pointer">🔄 Aggiorna ora</button>
+    </div>
   </div>
 
   <!-- Di quanto e' il totale, quanto e' denominato in EUR/BRL/USD (esposizione
@@ -1458,12 +1462,28 @@ const categories = [
       { icon:'⚖️', name:'Precatório — eredità padre', sub:'R$ 174.172 · in attesa pagamento', eur:29421, brl:174172 },
     ]
   },
-  { label:'📈 Investimenti', sub:'XP BR · Avenue · XP Int. · BTC', value:13654, color:'#059669',
+  { label:'📈 Investimenti', sub:'XP BR · Avenue · XP Int. · BTC', value:13908.51, color:'#059669',
     items:[
-      { icon:'🇺🇸', name:'Portafoglio Avenue', sub:'LMT · RY · BAC · RKLB · T · WBD + cash $33', eur:6980, usd:7935 },
-      { icon:'🇧🇷', name:'Portafoglio XP Brasile', sub:'FII · Azioni · Trend Investback', eur:5091, brl:30135 },
-      { icon:'🇺🇸', name:'XP Internazionale', sub:'PFE · SHY + cash $132,50', eur:1033, usd:1175 },
-      { icon:'₿', name:'Bitcoin (Revolut)', sub:'0,010 BTC · $62.630/BTC', eur:551, usd:626 },
+      { icon:'🇺🇸', name:'Lockheed Martin (LMT)', sub:'Avenue · 5 az. · $545,85/az', ticker:'LMT', qty:5, market:'us', currency:'usd', dividend:true, usd:2729.25, eur:2400.44 },
+      { icon:'🇺🇸', name:'Royal Bank of Canada (RY)', sub:'Avenue · 10 az. · $204,78/az', ticker:'RY', qty:10, market:'us', currency:'usd', dividend:true, usd:2047.80, eur:1800.88 },
+      { icon:'🇺🇸', name:'Bank of America (BAC)', sub:'Avenue · 26 az. · $58,69/az', ticker:'BAC', qty:26, market:'us', currency:'usd', dividend:true, usd:1525.94, eur:1341.96 },
+      { icon:'🇺🇸', name:'Rocket Lab (RKLB)', sub:'Avenue · 10 az. · $100,46/az', ticker:'RKLB', qty:10, market:'us', currency:'usd', dividend:false, usd:1004.60, eur:883.48 },
+      { icon:'🇺🇸', name:'AT&T (T)', sub:'Avenue · 31 az. · $20,57/az', ticker:'T', qty:31, market:'us', currency:'usd', dividend:true, usd:637.67, eur:560.79 },
+      { icon:'🇺🇸', name:'Warner Bros Discovery (WBD)', sub:'Avenue · 9 az. · $26,48/az', ticker:'WBD', qty:9, market:'us', currency:'usd', dividend:false, usd:238.32, eur:209.58 },
+      { icon:'💵', name:'Cash Avenue', sub:'Avenue · USD disponibile sul conto', market:'cash', currency:'usd', usd:33, eur:29.02 },
+      { icon:'🏢', name:'Alianza Trust Renda Imob. (ALZR11)', sub:'XP Brasile · FII · 475 cotas · R$10,37/cota', ticker:'ALZR11', qty:475, market:'b3', currency:'brl', dividend:true, brl:4925.75, eur:832.05 },
+      { icon:'🏢', name:'Kinea Índices de Preços (KNIP11)', sub:'XP Brasile · FII · 56 cotas · R$92,94/cota', ticker:'KNIP11', qty:56, market:'b3', currency:'brl', dividend:true, brl:5204.64, eur:879.16 },
+      { icon:'🏢', name:'Riza Terrax (RZTR11)', sub:'XP Brasile · FII · 100 cotas · R$87,32/cota', ticker:'RZTR11', qty:100, market:'b3', currency:'brl', dividend:true, brl:8732.00, eur:1475.00 },
+      { icon:'🏢', name:'TG Ativo Real (TGAR11)', sub:'XP Brasile · FII · 5 cotas · R$52,05/cota', ticker:'TGAR11', qty:5, market:'b3', currency:'brl', dividend:true, brl:260.25, eur:43.96 },
+      { icon:'🏢', name:'TRX Real Estate (TRXF11)', sub:'XP Brasile · FII · 50 cotas · R$91,43/cota', ticker:'TRXF11', qty:50, market:'b3', currency:'brl', dividend:true, brl:4571.50, eur:772.21 },
+      { icon:'🇧🇷', name:'CSN Mineração (CMIN3)', sub:'XP Brasile · Azione · 100 az. · R$4,31/az', ticker:'CMIN3', qty:100, market:'b3', currency:'brl', dividend:true, brl:431.00, eur:72.80 },
+      { icon:'🇧🇷', name:'Itaúsa (ITSA4)', sub:'XP Brasile · Azione · 107 az. · R$13,60/az', ticker:'ITSA4', qty:107, market:'b3', currency:'brl', dividend:true, brl:1455.20, eur:245.81 },
+      { icon:'🇧🇷', name:'Klabin (KLBN4)', sub:'XP Brasile · Azione · 222 az. · R$3,42/az', ticker:'KLBN4', qty:222, market:'b3', currency:'brl', dividend:true, brl:759.24, eur:128.25 },
+      { icon:'📊', name:'Trend Investback FIC FIRF', sub:'XP Brasile · Fundo RF Simples · valore manuale', market:'fixed', currency:'brl', dividend:false, brl:2996.18, eur:506.11 },
+      { icon:'🇺🇸', name:'Pfizer (PFE)', sub:'XP Internazionale · 32,42 az. · $29,29/az', ticker:'PFE', qty:32.42, market:'us', currency:'usd', dividend:true, usd:949.58, eur:835.09 },
+      { icon:'🇺🇸', name:'iShares 1-3Y Treasury (SHY)', sub:'XP Internazionale · 3,08 az. · $83,01/az', ticker:'SHY', qty:3.08, market:'us', currency:'usd', dividend:true, usd:255.67, eur:224.84 },
+      { icon:'💵', name:'Cash XP Internazionale', sub:'XP Internazionale · USD disponibile sul conto', market:'cash', currency:'usd', usd:132.50, eur:116.52 },
+      { icon:'₿', name:'Bitcoin (Revolut)', sub:'0,010 BTC', ticker:'BTC', qty:0.010, market:'crypto', currency:'usd', dividend:false, usd:626.30, eur:550.79 },
     ]
   },
   { label:'🏦 Liquidità', sub:'Tutti i conti correnti', value:5383, color:'#d97706',
@@ -1698,9 +1718,13 @@ function renderDetailPanel(i) {
     if(it.usd) extra=` <span style="color:#475569;font-size:0.63rem">($${Math.abs(it.usd).toLocaleString('it-IT')})</span>`;
     const row=document.createElement('div');
     row.className='detail-row';
+    const divTag = it.dividend===undefined ? '' :
+      (it.dividend
+        ? ' <span style="color:#34d399;font-weight:700;font-size:0.62rem">· 💰 paga dividendi</span>'
+        : ' <span style="color:#64748b;font-size:0.62rem">· non paga dividendi</span>');
     row.innerHTML=`<div class="detail-icon">${it.icon}</div>
       <div style="flex:1"><div class="detail-name">${it.name}</div>
-      <div class="detail-sub-text">${it.sub}</div>
+      <div class="detail-sub-text">${it.sub}${divTag}</div>
       <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${bW}%;background:${col}"></div></div></div>
       <div><div class="detail-amount" style="color:${col}">${sign}€ ${Math.abs(it.eur).toLocaleString('it-IT')}${extra}</div>
       <div class="detail-pct-text">${it.eur>0?pctI+'%':'debito'}</div></div>`;
@@ -2523,6 +2547,7 @@ window.addEventListener('fin-fx-updated', (e) => {
   if (!e.detail) return;
   RATE_BRL = e.detail.BRL;
   RATE_USD = e.detail.USD;
+  if (typeof recalcAllInvestimenti === 'function') recalcAllInvestimenti();
 });
 
 function renderFixedRows() {
@@ -2711,6 +2736,145 @@ function renderFlusso() {
 }
 
 renderFlusso();
+
+/* ===== MARKET DATA LIVE (Investimenti: azioni USA, FII/azioni B3, Bitcoin) =====
+   Aggiornamento automatico ogni 1 ora (client-side: richiede la pagina aperta nel
+   browser, non esiste un backend/cron in questo progetto - vedi PROGETTO.md).
+   Fonti gratuite, nessuna chiave API richiesta:
+   - Bitcoin: CoinGecko (CORS diretto)
+   - Azioni/FII B3 (Brasile): brapi.dev (CORS diretto, pensato per questo uso)
+   - Azioni USA: Yahoo Finance quote endpoint, tramite proxy CORS pubblico con
+     fallback a piu' proxy (l'endpoint Yahoo non manda sempre header CORS)
+   Se una fonte fallisce, si mantiene l'ultimo prezzo noto (cache in localStorage)
+   invece di azzerare il valore: un errore di rete non deve mai far sparire un dato. */
+const MARKET_PRICE_CACHE_KEY = 'market_price_cache_v1';
+let MARKET_PRICES = {};
+(function loadMarketPriceCache(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(MARKET_PRICE_CACHE_KEY) || 'null');
+    if (saved && saved.prices) MARKET_PRICES = saved.prices;
+  } catch(e) { /* cache non disponibile, ignora */ }
+})();
+
+function getInvestCategory() {
+  return categories.find(c => c.label.indexOf('Investimenti') !== -1);
+}
+
+async function fetchJsonWithFallback(urls) {
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      return await res.json();
+    } catch(e) { /* prova la url successiva della catena */ }
+  }
+  return null;
+}
+
+async function fetchUsPrices(tickers) {
+  if (!tickers.length) return {};
+  const target = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers.join(',')}`;
+  const data = await fetchJsonWithFallback([
+    target,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+    `https://corsproxy.io/?${encodeURIComponent(target)}`
+  ]);
+  const out = {};
+  try {
+    const results = (data && data.quoteResponse && data.quoteResponse.result) || [];
+    results.forEach(r => { if (r.symbol && typeof r.regularMarketPrice === 'number') out[r.symbol] = r.regularMarketPrice; });
+  } catch(e) { console.error('Errore parsing quotazioni USA:', e); }
+  return out;
+}
+
+async function fetchB3Prices(tickers) {
+  if (!tickers.length) return {};
+  const out = {};
+  try {
+    const res = await fetch(`https://brapi.dev/api/quote/${tickers.join(',')}`);
+    const data = await res.json();
+    (data.results || []).forEach(r => { if (r.symbol && typeof r.regularMarketPrice === 'number') out[r.symbol] = r.regularMarketPrice; });
+  } catch(e) { console.error('Errore quotazioni B3 (brapi.dev):', e); }
+  return out;
+}
+
+async function fetchBtcPrice() {
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+    const data = await res.json();
+    return (data && data.bitcoin && typeof data.bitcoin.usd === 'number') ? data.bitcoin.usd : null;
+  } catch(e) { console.error('Errore quotazione Bitcoin (CoinGecko):', e); return null; }
+}
+
+/* Ricalcola eur/usd/brl di ogni voce Investimenti usando MARKET_PRICES e il
+   tasso di cambio corrente (RATE_BRL/RATE_USD), senza rifare le chiamate di
+   rete: usato sia dopo un fetch riuscito sia quando cambia solo il tasso FX. */
+function recalcInvestimentiItem(it) {
+  const price = it.ticker ? MARKET_PRICES[it.ticker] : undefined;
+  if ((it.market === 'us' || it.market === 'crypto') && price !== undefined) {
+    it.usd = round2(it.qty * price);
+  } else if (it.market === 'b3' && price !== undefined) {
+    it.brl = round2(it.qty * price);
+  }
+  if (it.currency === 'usd' && it.usd !== undefined) it.eur = round2(it.usd / RATE_USD);
+  else if (it.currency === 'brl' && it.brl !== undefined) it.eur = round2(it.brl / RATE_BRL);
+}
+
+function recalcAllInvestimenti() {
+  const cat = getInvestCategory();
+  if (!cat) return;
+  cat.items.forEach(recalcInvestimentiItem);
+  cat.value = round2(cat.items.reduce((s, it) => s + (it.eur || 0), 0));
+  recomputeTotals();
+  drawDonut(activeIdx);
+  renderLegend();
+  renderTotal();
+  if (activeIdx !== null && categories[activeIdx] === cat) renderDetailPanel(activeIdx);
+}
+
+let marketRefreshInFlight = false;
+async function refreshMarketPrices(manual) {
+  if (marketRefreshInFlight) return;
+  marketRefreshInFlight = true;
+  const statusEl = document.getElementById('market-status-text');
+  if (statusEl && manual) statusEl.textContent = '📊 Aggiornamento prezzi in corso…';
+  const cat = getInvestCategory();
+  if (!cat) { marketRefreshInFlight = false; return; }
+
+  const usTickers = [...new Set(cat.items.filter(it => it.market === 'us').map(it => it.ticker))];
+  const b3Tickers = [...new Set(cat.items.filter(it => it.market === 'b3').map(it => it.ticker))];
+  const hasBtc = cat.items.some(it => it.market === 'crypto');
+
+  const [usPrices, b3Prices, btcPrice] = await Promise.all([
+    fetchUsPrices(usTickers),
+    fetchB3Prices(b3Tickers),
+    hasBtc ? fetchBtcPrice() : Promise.resolve(null)
+  ]);
+
+  const failedSources = [];
+  if (Object.keys(usPrices).length) Object.assign(MARKET_PRICES, usPrices);
+  else if (usTickers.length) failedSources.push('azioni USA');
+  if (Object.keys(b3Prices).length) Object.assign(MARKET_PRICES, b3Prices);
+  else if (b3Tickers.length) failedSources.push('B3');
+  if (btcPrice !== null) MARKET_PRICES['BTC'] = btcPrice;
+  else if (hasBtc) failedSources.push('Bitcoin');
+
+  try { localStorage.setItem(MARKET_PRICE_CACHE_KEY, JSON.stringify({ prices: MARKET_PRICES, ts: Date.now() })); } catch(e) { /* storage non disponibile, ignora */ }
+
+  recalcAllInvestimenti();
+
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0'), mm = String(now.getMinutes()).padStart(2,'0');
+  if (statusEl) {
+    statusEl.textContent = failedSources.length
+      ? `⚠️ Aggiornato alle ${hh}:${mm} (fallito: ${failedSources.join(', ')} · uso ultimo prezzo noto)`
+      : `📊 Prezzi aggiornati alle ${hh}:${mm}`;
+  }
+  marketRefreshInFlight = false;
+}
+
+refreshMarketPrices(false);
+setInterval(() => refreshMarketPrices(false), 60 * 60 * 1000);
 </script>
 
 </div><!-- /dashboard-view -->
