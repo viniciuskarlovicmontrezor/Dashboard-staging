@@ -1249,7 +1249,7 @@ document.getElementById('fixed-recurring-row').style.display = type === 'expense
 <div id="dashboard-view">
 
 <h1>💼 Dashboard Finanziario Personale</h1>
-<p class="subtitle">Aggiornato al 01 luglio 2026 · Cambio: 1 EUR = 5,92 BRL · 1 EUR = 1,1371 USD</p>
+<p class="subtitle" id="dashboard-subtitle">Aggiornato al 01 luglio 2026 · Cambio: 1 EUR = 5,92 BRL · 1 EUR = 1,1371 USD</p>
 
 <div class="tabs" style="margin-bottom:22px;">
   <div class="tab active" onclick="switchTab('patrimonio', this)">🏆 Patrimonio Netto</div>
@@ -2543,10 +2543,35 @@ window.addEventListener('fin-transactions-changed', () => {
 
 // Il cambio EUR/BRL/USD e' stato aggiornato (vedi Quick Add): il calcolatore di
 // trasferimento tra beni/conti deve usare da qui in poi il tasso aggiornato.
+const MESI_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+/* Aggiorna la riga "Aggiornato al ... · Cambio: ..." sotto il titolo, usando la
+   data effettiva a cui si riferisce il tasso (non necessariamente "oggi": se il
+   fetch fallisce si riusa l'ultimo tasso noto in cache, con la sua data reale). */
+function renderHeaderSubtitle(dateStr, brl, usd) {
+  const el = document.getElementById('dashboard-subtitle');
+  if (!el) return;
+  let giorno = '', mese = '', anno = '';
+  if (dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    giorno = String(d).padStart(2, '0');
+    mese = MESI_IT[m - 1];
+    anno = y;
+  } else {
+    const now = new Date();
+    giorno = String(now.getDate()).padStart(2, '0');
+    mese = MESI_IT[now.getMonth()];
+    anno = now.getFullYear();
+  }
+  const brlTxt = (brl !== undefined ? brl : RATE_BRL).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  const usdTxt = (usd !== undefined ? usd : RATE_USD).toLocaleString('it-IT', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  el.textContent = `Aggiornato al ${giorno} ${mese} ${anno} · Cambio: 1 EUR = ${brlTxt} BRL · 1 EUR = ${usdTxt} USD`;
+}
+
 window.addEventListener('fin-fx-updated', (e) => {
   if (!e.detail) return;
   RATE_BRL = e.detail.BRL;
   RATE_USD = e.detail.USD;
+  renderHeaderSubtitle(e.detail.date, e.detail.BRL, e.detail.USD);
   if (typeof recalcAllInvestimenti === 'function') recalcAllInvestimenti();
 });
 
